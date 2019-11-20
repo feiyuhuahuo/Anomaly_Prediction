@@ -1,6 +1,6 @@
 import torch.nn as nn
 import functools
-import torch.nn.functional as F
+import torch
 
 
 # modified as anopred said
@@ -47,5 +47,5 @@ class PixelDiscriminator(nn.Module):
 
     def forward(self, input):
         out = self.net(input)
-        out = F.sigmoid(out)
+        out = torch.sigmoid(out)
         return out

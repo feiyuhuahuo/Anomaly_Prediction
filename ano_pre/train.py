@@ -24,7 +24,7 @@ liteflow_model = '../liteFlownet/network-default.pytorch'
 
 writer_path = '../log/ano_pred_avenue'
 
-batch_size = 4
+batch_size = 2
 epochs = 20000
 pretrain = False
 
@@ -78,9 +78,9 @@ flow_network.cuda().eval()  # Use liteFlownet to generate optic flows, so set to
 
 adversarial_loss = Adversarial_Loss().cuda()
 discriminate_loss = Discriminate_Loss().cuda()
-gd_loss = Gradient_Loss(alpha, num_channels).cuda()
-op_loss = Flow_Loss().cuda()
-int_loss = Intensity_Loss(l_num).cuda()
+gradient_loss = Gradient_Loss(alpha, num_channels).cuda()
+flow_loss = Flow_Loss().cuda()
+intensity_loss = Intensity_Loss(l_num).cuda()
 step = 0
 
 if not pretrain:
@@ -98,7 +98,7 @@ optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=d_lr)
 writer = SummaryWriter(writer_path)
 
 dataset = img_dataset.ano_pred_Dataset(train_data, num_clips)
-train_dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
+train_dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True)
 
 test_dataset = img_dataset.ano_pred_Dataset(test_data, num_clips)
 test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True, num_workers=1,
@@ -109,23 +109,32 @@ for epoch in range(epochs):
         generator = generator.train()
         discriminator = discriminator.train()
 
-        target = input[:, -1, :, :, :].cuda()
+        input_frames = input[:, 0:12, :, :].cuda()
+        target_frame = input[:, 12:15, :, :].cuda()
+        input_last = input_frames[:, 9:12, :, :].cuda()
 
-        input = input[:, :-1, ]
-        input_last = input[:, -1, ].cuda()
-        input = input.view(input.shape[0], -1, input.shape[-2], input.shape[-1]).cuda()
+        # Re-show the original frames.
+        # aa = np.array(gt_frames.permute(0, 2, 3, 1).cpu()) * 255
+        # aa = aa.astype('uint8')
+        # import cv2
+        # for i in range(4):
+        #     cv2.imshow('aa', aa[0, :, :, 3*i:3*i+3])
+        #     cv2.waitKey()
 
-        test_target = test_input[:, -1, ].cuda()
-        test_input = test_input[:, :-1].view(test_input.shape[0], -1, test_input.shape[-2],
-                                             test_input.shape[-1]).cuda()
+        # TODO: do test
+        # test_target = test_input[:, -1, ].cuda()
+        # test_input = test_input[:, :-1].view(test_input.shape[0], -1, test_input.shape[-2],
+        #                                      test_input.shape[-1]).cuda()
 
         # ------- update optim_G --------------
-        G_output = generator(input)
 
-        pred_flow_esti_tensor = torch.cat([input_last, G_output], 1)
-        gt_flow_esti_tensor = torch.cat([input_last, target], 1)
-        flow_gt = lite_flow.batch_estimate(gt_flow_esti_tensor, flow_network)
-        flow_pred = lite_flow.batch_estimate(pred_flow_esti_tensor, flow_network)
+        G_frame = generator(input_frames)
+
+        gt_flow_input = torch.cat([input_last, target_frame], 1)
+        pred_flow_input = torch.cat([input_last, G_frame], 1)
+
+        flow_gt = lite_flow.batch_estimate(gt_flow_input, flow_network)
+        flow_pred = lite_flow.batch_estimate(pred_flow_input, flow_network)
 
         # if you want to use flownet2SD, comment out the part in front
         # pred_flow_esti_tensor = torch.cat([input_last.view(-1,3,1,test_input.shape[-2],test_input.shape[-1]), G_output.view(-1,3,1,test_input.shape[-2],test_input.shape[-1])], 2)
@@ -134,27 +143,22 @@ for epoch in range(epochs):
         # flow_gt=flow_network(gt_flow_esti_tensor*255.0)
         # flow_pred=flow_network(pred_flow_esti_tensor*255.0)
 
-        g_adv_loss = adversarial_loss(discriminator(G_output))
-        g_op_loss = op_loss(flow_pred, flow_gt)
-        g_int_loss = int_loss(G_output, target)
-        g_gd_loss = gd_loss(G_output, target)
-
-        g_loss = lam_adv * g_adv_loss + lam_gd * g_gd_loss + lam_op * g_op_loss + lam_int * g_int_loss
+        inte_loss = intensity_loss(G_frame, target_frame)
+        grad_loss = gradient_loss(G_frame, target_frame)
+        fl_loss = flow_loss(flow_pred, flow_gt)
+        G_loss = adversarial_loss(discriminator(G_frame))
+        G_loss_total = lam_adv * G_loss + lam_gd * grad_loss + lam_op * fl_loss + lam_int * inte_loss
+        D_loss = discriminate_loss(discriminator(target_frame), discriminator(G_frame.detach()))
 
         optimizer_G.zero_grad()
-
-        g_loss.backward()
+        G_loss_total.backward()
         optimizer_G.step()
 
-        train_psnr = psnr_error(G_output, target)
+        train_psnr = psnr_error(G_frame, target_frame)
 
         # ----------- update optim_D -------
         optimizer_D.zero_grad()
-
-        d_loss = discriminate_loss(discriminator(target), discriminator(G_output.detach()))
-        # d_loss.requires_grad=True
-
-        d_loss.backward()
+        D_loss.backward()
         optimizer_D.step()
 
         # ----------- cal psnr --------------
@@ -163,22 +167,22 @@ for epoch in range(epochs):
         test_psnr = psnr_error(test_output, test_target).cuda()
 
         if step % 10 == 0:
-            print("[{}/{}]: g_loss: {} d_loss {}".format(step, epoch, g_loss, d_loss))
-            print('\t gd_loss {}, op_loss {}, int_loss {} ,'.format(g_gd_loss, g_op_loss, g_int_loss))
+            print("[{}/{}]: g_loss: {} d_loss {}".format(step, epoch, G_loss_total, D_loss))
+            print('\t gd_loss {}, op_loss {}, int_loss {} ,'.format(grad_loss, fl_loss, inte_loss))
             print('\t train psnr{}，test_psnr {}'.format(train_psnr, test_psnr))
 
             writer.add_scalar('psnr/train_psnr', train_psnr, global_step=step)
             writer.add_scalar('psnr/test_psnr', test_psnr, global_step=step)
 
-            writer.add_scalar('total_loss/g_loss', g_loss, global_step=step)
-            writer.add_scalar('total_loss/d_loss', d_loss, global_step=step)
-            writer.add_scalar('g_loss/adv_loss', g_adv_loss, global_step=step)
-            writer.add_scalar('g_loss/op_loss', g_op_loss, global_step=step)
-            writer.add_scalar('g_loss/int_loss', g_int_loss, global_step=step)
-            writer.add_scalar('g_loss/gd_loss', g_gd_loss, global_step=step)
+            writer.add_scalar('total_loss/g_loss', G_loss_total, global_step=step)
+            writer.add_scalar('total_loss/d_loss', D_loss, global_step=step)
+            writer.add_scalar('g_loss/adv_loss', G_loss, global_step=step)
+            writer.add_scalar('g_loss/op_loss', fl_loss, global_step=step)
+            writer.add_scalar('g_loss/int_loss', inte_loss, global_step=step)
+            writer.add_scalar('g_loss/gd_loss', grad_loss, global_step=step)
 
-            writer.add_image('image/train_target', target[0], global_step=step)
-            writer.add_image('image/train_output', G_output[0], global_step=step)
+            writer.add_image('image/train_target', target_frame[0], global_step=step)
+            writer.add_image('image/train_output', G_frame[0], global_step=step)
             writer.add_image('image/test_target', test_target[0], global_step=step)
             writer.add_image('image/test_output', test_output[0], global_step=step)
 

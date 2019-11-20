@@ -29,8 +29,8 @@ class Gradient_Loss(nn.Module):
         pos = torch.from_numpy(np.identity(channels, dtype=np.float32))
         neg = -1 * pos
         # Note: when doing conv2d, the channel order is different from tensorflow, so do permutation.
-        self.filter_x = torch.stack((neg, pos)).unsqueeze(0).permute(3, 2, 0, 1)
-        self.filter_y = torch.stack((pos.unsqueeze(0), neg.unsqueeze(0))).permute(3, 2, 0, 1)
+        self.filter_x = torch.stack((neg, pos)).unsqueeze(0).permute(3, 2, 0, 1).cuda()
+        self.filter_y = torch.stack((pos.unsqueeze(0), neg.unsqueeze(0))).permute(3, 2, 0, 1).cuda()
 
     def forward(self, gen_frames, gt_frames):
         # Do padding to match the  result of the original tensorflow implementation
