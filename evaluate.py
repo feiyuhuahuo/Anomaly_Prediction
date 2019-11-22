@@ -1,26 +1,23 @@
-import sys
-sys.path.append('..')
-from Dataset import img_dataset
+import img_dataset
 from models.unet import UNet
 from torch.utils.data import DataLoader
 import numpy as np
-from ano_pre.util import psnr_error
-import pdb
+from utils import psnr_error
 import os
 import time
 import pickle
-from ano_pre import eval_metric
+import torch
+from config import test_data
+import eval_metric
 
-
-testing_data_folder = '/home/feiyu/Data/avenue/testing/frames'
 dataset_name = 'avenue'
 
 psnr_dir = '../psnr/'
 
 
-def evaluate(frame_num, input_channels, output_channels, model_path, evaluate_name):
+def evaluate(frame_num, input_channels, output_channels, model_path):
     generator = UNet(input_channels=input_channels, output_channel=output_channels).cuda().eval()
-    video_folders = os.listdir(testing_data_folder)
+    video_folders = os.listdir(test_data)
 
     video_folders.sort()
 
@@ -28,10 +25,10 @@ def evaluate(frame_num, input_channels, output_channels, model_path, evaluate_na
 
     psnr_records = []
     total = 0
-    # generator.load_state_dict(torch.load(model_path))
+    generator.load_state_dict(torch.load(model_path))
 
     for folder in video_folders:
-        _temp_test_folder = os.path.join(testing_data_folder, folder)
+        _temp_test_folder = os.path.join(test_data, folder)
         dataset = img_dataset.test_dataset(_temp_test_folder, clip_length=frame_num)
 
         test_iters = len(dataset) - frame_num + 1
@@ -74,4 +71,4 @@ def evaluate(frame_num, input_channels, output_channels, model_path, evaluate_na
 
 if __name__ == '__main__':
     evaluate(frame_num=5, input_channels=12, output_channels=3,
-             model_path='../pth_model/ano_pred_avenue_generator.pth-9000', evaluate_name='compute_auc')
+             model_path='../pth_model/ano_pred_avenue_generator.pth-9000')

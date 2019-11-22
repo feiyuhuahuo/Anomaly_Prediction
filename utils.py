@@ -1,4 +1,6 @@
 import torch
+import glob
+import os
 
 
 def log10(t):
@@ -32,3 +34,21 @@ def psnr_error(gen_frames, gt_frames):
     square_diff = (gt_frames - gen_frames) ** 2
     batch_errors = 10 * log10(1. / ((1. / num_pixels) * torch.sum(square_diff, [1, 2, 3])))
     return torch.mean(batch_errors)
+
+
+def saver(model_state_dict, model_path, step, max_to_save=5):
+    total_models = glob.glob(model_path + '*')
+    if len(total_models) >= max_to_save:
+        total_models.sort()
+        os.remove(total_models[0])
+    torch.save(model_state_dict, model_path + '-' + str(step))
+    print('model {} save successfully!'.format(model_path + '-' + str(step)))
+
+
+def weights_init_normal(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm2d') != -1:
+        torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
+        torch.nn.init.constant_(m.bias.data, 0.0)

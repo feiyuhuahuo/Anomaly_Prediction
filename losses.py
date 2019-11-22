@@ -13,18 +13,16 @@ class Flow_Loss(nn.Module):
 
 
 class Intensity_Loss(nn.Module):
-    def __init__(self, l_num):
+    def __init__(self):
         super().__init__()
-        self.l_num = l_num
 
     def forward(self, gen_frames, gt_frames):
-        return torch.mean(torch.abs((gen_frames - gt_frames) ** self.l_num))
+        return torch.mean(torch.abs((gen_frames - gt_frames) ** 2))
 
 
 class Gradient_Loss(nn.Module):
-    def __init__(self, alpha, channels):
+    def __init__(self, channels):
         super().__init__()
-        self.alpha = alpha
 
         pos = torch.from_numpy(np.identity(channels, dtype=np.float32))
         neg = -1 * pos
@@ -47,7 +45,7 @@ class Gradient_Loss(nn.Module):
         grad_diff_x = torch.abs(gt_dx - gen_dx)
         grad_diff_y = torch.abs(gt_dy - gen_dy)
 
-        return torch.mean(grad_diff_x ** self.alpha + grad_diff_y ** self.alpha)
+        return torch.mean(grad_diff_x + grad_diff_y)
 
 
 class Adversarial_Loss(nn.Module):

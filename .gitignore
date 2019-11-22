@@ -2,3 +2,4 @@ log/
 *.pytorch
 __pycache__/
 .idea/
+*.pth
