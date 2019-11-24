@@ -1,4 +1,4 @@
-log/
+tensorboard_log/
 *.pytorch
 __pycache__/
 .idea/

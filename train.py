@@ -1,24 +1,29 @@
 from utils import *
 from losses import *
-import img_dataset
+import Dataset
 from models.unet import UNet
 from models.pix2pix_networks import PixelDiscriminator
 from liteFlownet import lite_flownet as lite_flow
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 import argparse
-from config import *
+from config import update_config
 from flownet2.models import FlowNet2SD
 from evaluate import evaluate
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
 parser.add_argument('--batch_size', default=2, type=int)
-parser.add_argument('--resume', default=None, type=str, help='The path of the weight file to resume training with.')
+parser.add_argument('--dataset_type', default='colorful', type=str, help='The color type of the dataset.')
+parser.add_argument('--resume_g', default=None, type=str,
+                    help='The path of the pre-trained generator model to resume training with.')
+parser.add_argument('--resume_d', default=None, type=str,
+                    help='The path of the pre-trained discriminator model to resume training with.')
 parser.add_argument('--val_interval', default=10000, type=int,
                     help='Evalute and save the model every [val_interval] iterations, pass -1 to disable.')
 parser.add_argument('--flownet2sd', default=False, action='store_true', help='Use Flownet2SD instead of LiteFlownet.')
 
 args = parser.parse_args()
+cfg = update_config(args)
 
 generator = UNet(input_channels=12, output_channel=3).cuda()
 discriminator = PixelDiscriminator(3, [128, 256, 512, 512], use_norm=False).cuda()
@@ -27,32 +32,31 @@ if not args.resume:
     generator.apply(weights_init_normal)
     discriminator.apply(weights_init_normal)
 else:
-    generator.load_state_dict(torch.load(generator_model))
-    discriminator.load_state_dict(torch.load(discriminator_model))
-    step = int(generator_model.split('-')[-1])
-    print('pretrained model loaded!')
+    generator.load_state_dict(torch.load(args.resume_g))
+    discriminator.load_state_dict(torch.load(args.resume_d))
+    print('Pre-trained model loaded!')
 
 if args.flownet2sd:
     flow_net = FlowNet2SD()
-    flow_net.load_state_dict(torch.load(flownet2SD_model_path)['state_dict'])
+    flow_net.load_state_dict(torch.load('flownet2/FlowNet2-SD.pth')['state_dict'])
 else:
     flow_net = lite_flow.Network()
-    flow_net.load_state_dict(torch.load(liteflow_model))
+    flow_net.load_state_dict(torch.load('liteFlownet/network-default.pytorch'))
 
 flow_net.cuda().eval()  # Use FlowNet to generate optic flows, so set to eval mode.
 
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=g_lr)
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=d_lr)
+optimizer_G = torch.optim.Adam(generator.parameters(), lr=cfg.g_lr)
+optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=cfg.d_lr)
 adversarial_loss = Adversarial_Loss().cuda()
 discriminate_loss = Discriminate_Loss().cuda()
-gradient_loss = Gradient_Loss(num_channels).cuda()
+gradient_loss = Gradient_Loss(3 if args.dataset_type == 'colorful' else 1).cuda()
 flow_loss = Flow_Loss().cuda()
 intensity_loss = Intensity_Loss().cuda()
 
-writer = SummaryWriter(writer_path)
+writer = SummaryWriter('tensorboard_log')
 
-train_dataset = img_dataset.ano_pred_Dataset(train_data, num_clips)
-test_dataset = img_dataset.ano_pred_Dataset(test_data, num_clips)
+train_dataset = Dataset.train_dataset(cfg.train_data, num_clips)
+test_dataset = Dataset.train_dataset(test_data, num_clips)
 # Remember to set drop_last=True because we need to use 4 frames to predict one frame.
 train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True)
 

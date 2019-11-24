@@ -5,9 +5,9 @@ import os
 
 def log10(t):
     """
-    Calculates the base-10 log of each element in t.
-    @param t: The tensor from which to calculate the base-10 log.
-    @return: A tensor with the base-10 log of each element in t.
+    Calculates the base-10 tensorboard_log of each element in t.
+    @param t: The tensor from which to calculate the base-10 tensorboard_log.
+    @return: A tensor with the base-10 tensorboard_log of each element in t.
     """
 
     numerator = torch.log(t)
@@ -52,3 +52,21 @@ def weights_init_normal(m):
     elif classname.find('BatchNorm2d') != -1:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
+
+
+class RecordResult(object):
+    def __init__(self, fpr=None, tpr=None, auc=-np.inf, dataset=None, loss_file=None):
+        self.fpr = fpr
+        self.tpr = tpr
+        self.auc = auc
+        self.dataset = dataset
+        self.loss_file = loss_file
+
+    def __lt__(self, other):
+        return self.auc < other.auc
+
+    def __gt__(self, other):
+        return self.auc > other.auc
+
+    def __str__(self):
+        return 'dataset = {}, loss file = {}, auc = {}'.format(self.dataset, self.loss_file, self.auc)

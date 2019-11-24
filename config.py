@@ -1,27 +1,33 @@
 #!/usr/bin/env python 
 # -*- coding:utf-8 -*-
 
-train_data = '/home/feiyu/Data/avenue/training/frames'
-test_data = '/home/feiyu/Data/avenue/testing/frames'
+config = {'train_data': '/home/feiyu/Data/avenue/training/frames',
+          'test_data': '/home/feiyu/Data/avenue/testing/frames',
+          'batch_size': 4,
+          'g_lr': 0.0002,
+          'd_lr': 0.00002,
+          'num_input': 4,
+          }
 
-generator_model = '../pth_model/ano_pred_avenue_generator_2.pth'
-discriminator_model = '../pth_model/ano_pred_avenue_discriminator_2.pth'
-liteflow_model = '../liteFlownet/network-default.pytorch'
 
-writer_path = '../log/ano_pred_avenue'
-flownet2SD_model_path = 'flownet2/FlowNet2-SD.pth'
+class dict2class:
+    def __init__(self, config):
+        for k, v in config.items():
+            self.__setattr__(k, v)
 
-batch_size = 2
-epochs = 20000
-pretrain = False
+    def print_cfg(self):
+        for k, v in vars(self).items():
+            print(f'{k}: {v}')
 
-# color dataset
-g_lr = 0.0002
-d_lr = 0.00002
 
-num_clips = 5
-num_his = 1
-num_unet_layers = 4
+def update_config(args):
+    config['batch_size'] = args.batch_size
 
-num_channels = 3  # avenue is 3, UCSD is 1
-discriminator_channels = [128, 256, 512, 512]
+    assert args.dataset_type in ['colorful', 'grayscale'], 'Dataset type can only be colorful or greyscale.'
+    if args.dataset_type == 'colorful':
+        pass
+    else:
+        config['g_lr'] = 0.0001
+        config['d_lr'] = 0.00001
+
+    return dict2class(config)
