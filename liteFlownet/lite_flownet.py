@@ -356,11 +356,11 @@ class Network(torch.nn.Module):
 
     @staticmethod
     def batch_estimate(tensor_batch, moduleNetwork):
-        # the tensor have been changed into [0.0,1.0] and [b c h w]
+        tensor_batch = (tensor_batch + 1) / 2  # normalize to 0 ~ 1.
         intWidth = tensor_batch.size(3)
         intHeight = tensor_batch.size(2)
-        tensorFirst = tensor_batch[:, :3, ]
-        tensorSecond = tensor_batch[:, 3:, ]
+        tensorFirst = tensor_batch[:, :3, ...]
+        tensorSecond = tensor_batch[:, 3:, ...]
 
         intPreprocessedWidth = int(math.floor(math.ceil(intWidth / 32.0) * 32.0))
         intPreprocessedHeight = int(math.floor(math.ceil(intHeight / 32.0) * 32.0))

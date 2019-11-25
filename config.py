@@ -1,13 +1,15 @@
 #!/usr/bin/env python 
 # -*- coding:utf-8 -*-
 
-config = {'train_data': '/home/feiyu/Data/avenue/training/frames',
-          'test_data': '/home/feiyu/Data/avenue/testing/frames',
-          'batch_size': 4,
-          'g_lr': 0.0002,
-          'd_lr': 0.00002,
-          'num_input': 4,
-          }
+default_config = {'dataset': 'avenue',
+                  'train_data': '/home/feiyu/Data/avenue/training/frames',
+                  'test_data': '/home/feiyu/Data/avenue/testing/frames',
+                  'batch_size': 4,
+                  'g_lr': 0.0002,
+                  'd_lr': 0.00002,
+                  'num_input': 4,
+                  'iters': 80000,
+                  }
 
 
 class dict2class:
@@ -16,18 +18,21 @@ class dict2class:
             self.__setattr__(k, v)
 
     def print_cfg(self):
+        print('\n' + '-' * 30 + 'Config' + '-' * 30)
         for k, v in vars(self).items():
             print(f'{k}: {v}')
+        print()
 
 
-def update_config(args):
-    config['batch_size'] = args.batch_size
+def update_config(args=None):
+    default_config['batch_size'] = args.batch_size
+    default_config['dataset'] = args.dataset
+    default_config['train_data'] = f'/home/feiyu/Data/{args.dataset}/training/frames'
+    default_config['test_data'] = f'/home/feiyu/Data/{args.dataset}/testing/frames'
 
-    assert args.dataset_type in ['colorful', 'grayscale'], 'Dataset type can only be colorful or greyscale.'
-    if args.dataset_type == 'colorful':
-        pass
-    else:
-        config['g_lr'] = 0.0001
-        config['d_lr'] = 0.00001
+    assert args.dataset_type in ['color', 'grey'], 'Dataset type can only be color scale or grey scale.'
+    if args.dataset_type == 'grey':
+        default_config['g_lr'] = 0.0001
+        default_config['d_lr'] = 0.00001
 
-    return dict2class(config)
+    return dict2class(default_config)  # change dict contents to class attributes

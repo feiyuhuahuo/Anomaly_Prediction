@@ -6,10 +6,10 @@ import torch.nn.functional as F
 class double_conv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.conv = nn.Sequential(nn.Conv2d(in_ch, out_ch, 3, padding=1),
+        self.conv = nn.Sequential(nn.Conv2d(in_ch, out_ch, 3, padding=1, bias=False),
                                   nn.BatchNorm2d(out_ch),
                                   nn.ReLU(inplace=True),
-                                  nn.Conv2d(out_ch, out_ch, 3, padding=1),
+                                  nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False),
                                   nn.BatchNorm2d(out_ch),
                                   nn.ReLU(inplace=True))
 
@@ -40,18 +40,9 @@ class down(nn.Module):
 
 
 class up(nn.Module):
-    def __init__(self, in_ch, out_ch, bilinear=False):
+    def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.bilinear = bilinear
-        #  would be a nice idea if the upsampling could be learned too,
-        #  but my machine do not have enough memory to handle all those weights
-        if self.bilinear:
-            self.up = nn.Sequential(nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-                                    nn.Conv2d(in_ch, in_ch // 2, 1), )
-
-        else:
-            self.up = nn.ConvTranspose2d(in_ch, in_ch // 2, 2, stride=2)
-
+        self.up = nn.ConvTranspose2d(in_ch, in_ch // 2, 2, stride=2)
         self.conv = double_conv(in_ch, out_ch)
 
     def forward(self, x1, x2):
@@ -70,16 +61,6 @@ class up(nn.Module):
         return x
 
 
-class outconv(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super().__init__()
-        self.conv = nn.Conv2d(in_ch, out_ch, 1)
-
-    def forward(self, x):
-        x = self.conv(x)
-        return x
-
-
 class UNet(nn.Module):
     def __init__(self, input_channels, output_channel=3):
         super(UNet, self).__init__()
@@ -90,7 +71,7 @@ class UNet(nn.Module):
         self.up1 = up(512, 256)
         self.up2 = up(256, 128)
         self.up3 = up(128, 64)
-        self.outc = outconv(64, output_channel)
+        self.outc = nn.Conv2d(64, output_channel, kernel_size=3, padding=1)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -102,7 +83,7 @@ class UNet(nn.Module):
         x = self.up3(x, x1)
         x = self.outc(x)
 
-        return torch.sigmoid(x)
+        return torch.tanh(x)
 
 
 def _test():
