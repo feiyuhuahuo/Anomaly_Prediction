@@ -23,6 +23,7 @@ parser.add_argument('--resume_g', default=None, type=str,
                     help='The path of the pre-trained generator model to resume training with.')
 parser.add_argument('--resume_d', default=None, type=str,
                     help='The path of the pre-trained discriminator model to resume training with.')
+parser.add_argument('--input_num', default='4', type=int, help='The frame number to be used to predict one frame.')
 parser.add_argument('--iters', default='80000', type=int, help='The total iteration number.')
 parser.add_argument('--show_flow', default=False, action='store_true',
                     help='If True, the first batch of ground truth optic flow could be visualized and saved.')
@@ -34,8 +35,9 @@ args = parser.parse_args()
 cfg = update_config(args)
 cfg.print_cfg()
 
-generator = UNet(input_channels=12, output_channel=3).cuda()
-discriminator = PixelDiscriminator(3, [128, 256, 512, 512], use_norm=False).cuda()
+color_c = 3 if cfg.dataset_type == 'color' else 1
+generator = UNet(input_channels=color_c * cfg.input_num, output_channel=color_c).cuda()
+discriminator = PixelDiscriminator(input_nc=color_c).cuda()
 
 if args.resume_g:
     generator.load_state_dict(torch.load(args.resume_g))
@@ -63,16 +65,17 @@ optimizer_G = torch.optim.Adam(generator.parameters(), lr=cfg.g_lr)
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=cfg.d_lr)
 adversarial_loss = Adversarial_Loss().cuda()
 discriminate_loss = Discriminate_Loss().cuda()
-gradient_loss = Gradient_Loss(3 if args.dataset_type == 'color' else 1).cuda()
+gradient_loss = Gradient_Loss(color_c).cuda()
 flow_loss = Flow_Loss().cuda()
 intensity_loss = Intensity_Loss().cuda()
 
 writer = SummaryWriter('tensorboard_log')
 
-train_dataset = Dataset.train_dataset(cfg.train_data, 5)
-test_dataset = Dataset.train_dataset(cfg.test_data, 5)
+# TODO: the grey image can still be read as 3 channels, how to decide the channel issue?
+train_dataset = Dataset.train_dataset(cfg.train_data, cfg.input_num + 1)
+test_dataset = Dataset.train_dataset(cfg.test_data, cfg.input_num + 1)
 # Remember to set drop_last=True, because we need to use 4 frames to predict one frame.
-train_dataloader = DataLoader(dataset=train_dataset, batch_size=cfg.batch_size, shuffle=False,
+train_dataloader = DataLoader(dataset=train_dataset, batch_size=cfg.batch_size, shuffle=True,
                               num_workers=4, drop_last=True)
 
 step = 0
@@ -153,9 +156,9 @@ while training:
             writer.add_image('image/train_target', target_frame[0], global_step=step)
             writer.add_image('image/train_output', G_frame[0], global_step=step)
 
-        if step % 500 == 0:
-            torch.save(generator.state_dict(), f'weights/g_model_{step}.pth')
-            torch.save(discriminator.state_dict(), f'weights/d_model_{step}.pth')
+        if step % 50 == 0:
+            torch.save({'net': generator.state_dict(), 'opti': optimizer_G.state_dict()}, f'weights/G_{step}.pth')
+            torch.save({'net': discriminator.state_dict(), 'opti': optimizer_D.state_dict()}, f'weights/D_{step}.pth')
 
         if step > args.iters:
             training = False

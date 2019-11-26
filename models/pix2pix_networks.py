@@ -3,11 +3,10 @@ import functools
 import torch
 
 
-# modified as anopred said
 class PixelDiscriminator(nn.Module):
     """Defines a 1x1 PatchGAN discriminator (pixelGAN)"""
 
-    def __init__(self, input_nc, num_filters, use_norm=False, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, num_filters=(128, 256, 512, 512), use_norm=False, norm_layer=nn.BatchNorm2d):
         """Construct a 1x1 PatchGAN discriminator
 
         Parameters:
