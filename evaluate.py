@@ -10,13 +10,17 @@ import argparse
 from config import update_config
 from sklearn import metrics
 from Dataset import label_loader
+import pdb
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
-parser.add_argument('--dataset_type', default='colorful', type=str, help='The color type of the dataset.')
-parser.add_argument('--model', default='colorful', type=str, help='The pre-trained model to evaluate.')
+parser.add_argument('--dataset', default='avenue', type=str, help='The name of the dataset to train.')
+parser.add_argument('--input_num', default='4', type=int, help='The frame number to be used to predict one frame.')
+parser.add_argument('--color_type', default='colorful', type=str, help='The color type of the dataset.')
+parser.add_argument('--trained_g', default='G_50.pth', type=str, help='The pre-trained generator to evaluate.')
 
 args = parser.parse_args()
-cfg = update_config(args)
+test_cfg = update_config(args, mode='test')
+test_cfg.print_cfg()
 
 
 def evaluate(cfg):
@@ -28,11 +32,11 @@ def evaluate(cfg):
 
     psnr_records = []
     total = 0
-    generator.load_state_dict(torch.load(args.model))
+    generator.load_state_dict(torch.load('weights/' + args.trained_g)['net'])
 
     for folder in video_folders:
-        _temp_test_folder = os.path.join(cfg.test_data, folder)
-        dataset = Dataset.test_dataset(_temp_test_folder, clip_length=5)
+        one_folder = os.path.join(cfg.test_data, folder)
+        dataset = Dataset.test_dataset(one_folder, clip_length=5)
 
         test_iters = len(dataset) - 5 + 1
         test_counter = 0
@@ -47,6 +51,8 @@ def evaluate(cfg):
             G_frame = generator(input_frames)
             test_psnr = psnr_error(G_frame, target_frame)
             test_psnr = test_psnr.tolist()
+            pdb.set_trace()
+
             psnrs[test_counter + 5 - 1] = test_psnr
 
             test_counter += 1
@@ -54,10 +60,10 @@ def evaluate(cfg):
             if test_counter >= test_iters:
                 psnrs[:5 - 1] = psnrs[5 - 1]
                 psnr_records.append(psnrs)
-                print('finish test video set {}'.format(_temp_test_folder))
+                print('finish test video set {}'.format(one_folder))
                 break
 
-    results = {'dataset': dataset_name, 'psnr': psnr_records, 'diff_mask': []}
+    results = {'dataset': test_cfg.dataset, 'psnr': psnr_records, 'diff_mask': []}
 
     used_time = time.time() - time_stamp
     print('total time = {}, fps = {}'.format(used_time, total / used_time))
@@ -100,4 +106,4 @@ if __name__ == '__main__':
     # print('~~~~~~~~~~~~`')
     # print(thresholds)
     # print('~~~~~~~~~~~~`')
-    evaluate(cfg)
+    evaluate(test_cfg)

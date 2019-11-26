@@ -1,16 +1,11 @@
 #!/usr/bin/env python 
 # -*- coding:utf-8 -*-
 
-default_config = {'dataset': 'avenue',
-                  'train_data': '/home/feiyu/Data/avenue/training/frames',
-                  'test_data': '/home/feiyu/Data/avenue/testing/frames',
-                  'batch_size': 4,
-                  'g_lr': 0.0002,
-                  'd_lr': 0.00002,
-                  'input_num': 4,
-                  'dataset_type': 'color',
-                  'iters': 80000,
-                  }
+share_config = {'mode': 'training',
+                'dataset': 'avenue',
+                'data_root': '/home/feiyu/Data/',  # remember the final '/'
+                'color_type': 'colorful',
+                'input_num': 4}
 
 
 class dict2class:
@@ -19,23 +14,29 @@ class dict2class:
             self.__setattr__(k, v)
 
     def print_cfg(self):
-        print('\n' + '-' * 30 + 'Config' + '-' * 30)
+        print('\n' + '-' * 30 + f'{self.mode} cfg' + '-' * 30)
         for k, v in vars(self).items():
             print(f'{k}: {v}')
         print()
 
 
-def update_config(args=None):
-    default_config['batch_size'] = args.batch_size
-    default_config['dataset'] = args.dataset
-    default_config['train_data'] = default_config['train_data'].replace('avenue', args.dataset)
-    default_config['test_data'] = default_config['test_data'].replace('avenue', args.dataset)
-    default_config['input_num'] = args.input_num
+def update_config(args=None, mode=None):
+    share_config['mode'] = mode
+    share_config['dataset'] = args.dataset
+    share_config['input_num'] = args.input_num
 
-    assert args.dataset_type in ['color', 'grey'], 'Dataset type can only be color scale or grey scale.'
-    if args.dataset_type == 'grey':
-        default_config['dataset_type'] = args.dataset_type
-        default_config['g_lr'] = 0.0001
-        default_config['d_lr'] = 0.00001
+    assert args.color_type in ['colorful', 'grey'], 'Color type can only be \'colorful\' or \'grey\'.'
+    share_config['color_type'] = args.color_type
 
-    return dict2class(default_config)  # change dict contents to class attributes
+    if mode == 'train':
+        share_config['batch_size'] = args.batch_size
+        share_config['train_data'] = share_config['data_root'] + args.dataset + '/training/frames'
+        share_config['test_data'] = share_config['data_root'] + args.dataset + '/testing/frames'
+        share_config['g_lr'] = 0.0002 if args.color_type == 'colorful' else 0.0001
+        share_config['d_lr'] = 0.00002 if args.color_type == 'colorful' else 0.00001
+        share_config['iters'] = args.iters
+
+    elif mode == 'test':
+        share_config['test_data'] = share_config['test_data'].replace('avenue', args.dataset)
+
+    return dict2class(share_config)  # change dict keys to class attributes

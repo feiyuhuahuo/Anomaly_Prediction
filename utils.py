@@ -8,7 +8,6 @@ def log10(t):
     @param t: The tensor from which to calculate the base-10 tensorboard_log.
     @return: A tensor with the base-10 tensorboard_log of each element in t.
     """
-
     numerator = torch.log(t)
     denominator = torch.log(torch.FloatTensor([10.])).cuda()
     return numerator / denominator

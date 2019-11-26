@@ -18,7 +18,7 @@ import cv2
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
 parser.add_argument('--batch_size', default=2, type=int)
 parser.add_argument('--dataset', default='avenue', type=str, help='The name of the dataset to train.')
-parser.add_argument('--dataset_type', default='colorful', type=str, help='The color type of the dataset.')
+parser.add_argument('--color_type', default='colorful', type=str, help='The color type of the dataset.')
 parser.add_argument('--resume_g', default=None, type=str,
                     help='The path of the pre-trained generator model to resume training with.')
 parser.add_argument('--resume_d', default=None, type=str,
@@ -32,11 +32,11 @@ parser.add_argument('--val_interval', default=10000, type=int,
 parser.add_argument('--flownet2sd', default=False, action='store_true', help='Use Flownet2SD instead of LiteFlownet.')
 
 args = parser.parse_args()
-cfg = update_config(args)
-cfg.print_cfg()
+train_cfg = update_config(args, mode='train')
+train_cfg.print_cfg()
 
-color_c = 3 if cfg.dataset_type == 'color' else 1
-generator = UNet(input_channels=color_c * cfg.input_num, output_channel=color_c).cuda()
+color_c = 3 if train_cfg.color_type == 'colorful' else 1
+generator = UNet(input_channels=color_c * train_cfg.input_num, output_channel=color_c).cuda()
 discriminator = PixelDiscriminator(input_nc=color_c).cuda()
 
 if args.resume_g:
@@ -61,8 +61,8 @@ else:
 
 flow_net.cuda().eval()  # Use flow_net to generate optic flows, so set to eval mode.
 
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=cfg.g_lr)
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=cfg.d_lr)
+optimizer_G = torch.optim.Adam(generator.parameters(), lr=train_cfg.g_lr)
+optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=train_cfg.d_lr)
 adversarial_loss = Adversarial_Loss().cuda()
 discriminate_loss = Discriminate_Loss().cuda()
 gradient_loss = Gradient_Loss(color_c).cuda()
@@ -72,10 +72,10 @@ intensity_loss = Intensity_Loss().cuda()
 writer = SummaryWriter('tensorboard_log')
 
 # TODO: the grey image can still be read as 3 channels, how to decide the channel issue?
-train_dataset = Dataset.train_dataset(cfg.train_data, cfg.input_num + 1)
-test_dataset = Dataset.train_dataset(cfg.test_data, cfg.input_num + 1)
+train_dataset = Dataset.train_dataset(train_cfg.train_data, train_cfg.input_num + 1)
+test_dataset = Dataset.train_dataset(train_cfg.test_data, train_cfg.input_num + 1)
 # Remember to set drop_last=True, because we need to use 4 frames to predict one frame.
-train_dataloader = DataLoader(dataset=train_dataset, batch_size=cfg.batch_size, shuffle=True,
+train_dataloader = DataLoader(dataset=train_dataset, batch_size=train_cfg.batch_size, shuffle=True,
                               num_workers=4, drop_last=True)
 
 step = 0
@@ -105,7 +105,7 @@ while training:
                 flow = np.array(flow_gt.cpu().detach().numpy().transpose(0, 2, 3, 1), np.float32)  # to (n, w, h, 2)
                 for i in range(flow.shape[0]):
                     aa = flow_to_color(flow[i], convert_to_bgr=False)
-                    path = cfg.train_data.split('/')[-3] + '_' + flow_strs[i]
+                    path = train_cfg.train_data.split('/')[-3] + '_' + flow_strs[i]
                     cv2.imwrite(f'images/{path}.jpg', aa)  # e.g. images/avenue_4_574-575.jpg
 
         else:
@@ -140,11 +140,11 @@ while training:
         temp = time_end
 
         if step % 10 == 0:
-            time_reamin = (cfg.iters - step) / step * elapsed
+            time_reamin = (train_cfg.iters - step) / step * elapsed
             eta = str(datetime.timedelta(seconds=time_reamin)).split('.')[0]
             psnr = psnr_error(G_frame, target_frame)
             print(f"[{step}]  inte_l: {inte_l:.3f} | grad_l: {grad_l:.3f} | fl_l: {fl_l:.3f} | g_l: {g_l:.3f} | "
-                  f"G_l_total: {G_l_total:.3f} | D_l: {D_l:.3f} | psnr: {psnr:.3f} | iter: {iter_t:.3f} | ETA: {eta}")
+                  f"G_l_total: {G_l_total:.3f} | D_l: {D_l:.3f} | psnr: {psnr:.3f} | iter: {iter_t:.3f}s | ETA: {eta}")
 
             writer.add_scalar('psnr/train_psnr', psnr, global_step=step)
             writer.add_scalar('total_loss/g_loss_total', G_l_total, global_step=step)
@@ -156,9 +156,12 @@ while training:
             writer.add_image('image/train_target', target_frame[0], global_step=step)
             writer.add_image('image/train_output', G_frame[0], global_step=step)
 
-        if step % 50 == 0:
-            torch.save({'net': generator.state_dict(), 'opti': optimizer_G.state_dict()}, f'weights/G_{step}.pth')
-            torch.save({'net': discriminator.state_dict(), 'opti': optimizer_D.state_dict()}, f'weights/D_{step}.pth')
+        if step % 5000 == 0:
+            g_dict = {'net': generator.state_dict(), 'optimizer': optimizer_G.state_dict()}
+            d_dict = {'net': discriminator.state_dict(), 'optimizer': optimizer_D.state_dict()}
+            torch.save(g_dict, f'weights/G_{train_cfg.dataset}_{step}.pth')
+            torch.save(d_dict, f'weights/D_{train_cfg.dataset}_{step}.pth')
+            print(f'\nAlready saved \'G_{train_cfg.dataset}_{step}.pth\', \'D_{train_cfg.dataset}_{step}.pth\'.')
 
         if step > args.iters:
             training = False
