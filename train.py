@@ -12,8 +12,7 @@ import datetime
 from config import update_config
 from flownet2.models import FlowNet2SD
 import cv2
-
-# from evaluate import evaluate
+from evaluate import val
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
 parser.add_argument('--batch_size', default=2, type=int)
@@ -27,9 +26,10 @@ parser.add_argument('--input_num', default='4', type=int, help='The frame number
 parser.add_argument('--iters', default='80000', type=int, help='The total iteration number.')
 parser.add_argument('--show_flow', default=False, action='store_true',
                     help='If True, the first batch of ground truth optic flow could be visualized and saved.')
+parser.add_argument('--save_interval', default=5000, type=int, help='Save the model every [save_interval] iterations.')
 parser.add_argument('--val_interval', default=10000, type=int,
-                    help='Evalute and save the model every [val_interval] iterations, pass -1 to disable.')
-parser.add_argument('--flownet2sd', default=False, action='store_true', help='Use Flownet2SD instead of LiteFlownet.')
+                    help='Evaluate the model every [val_interval] iterations, pass -1 to disable.')
+parser.add_argument('--flownet', default='lite', type=str, help='lite: LiteFlownet, 2sd: FlowNet2SD.')
 
 args = parser.parse_args()
 train_cfg = update_config(args, mode='train')
@@ -52,7 +52,8 @@ else:
     discriminator.apply(weights_init_normal)
     print('Discriminator is going to be trained from scratch.')
 
-if args.flownet2sd:
+assert train_cfg.flownet in ('lite', '2sd'), 'Flow net only supports LiteFlownet or FlowNet2SD currently.'
+if train_cfg.flownet == '2sd':
     flow_net = FlowNet2SD()
     flow_net.load_state_dict(torch.load('flownet2/FlowNet2-SD.pth')['state_dict'])
 else:
@@ -75,8 +76,8 @@ writer = SummaryWriter('tensorboard_log')
 train_dataset = Dataset.train_dataset(train_cfg.train_data, train_cfg.input_num + 1)
 test_dataset = Dataset.train_dataset(train_cfg.test_data, train_cfg.input_num + 1)
 # Remember to set drop_last=True, because we need to use 4 frames to predict one frame.
-train_dataloader = DataLoader(dataset=train_dataset, batch_size=train_cfg.batch_size, shuffle=True,
-                              num_workers=4, drop_last=True)
+train_dataloader = DataLoader(dataset=train_dataset, batch_size=train_cfg.batch_size,
+                              shuffle=True, num_workers=4, drop_last=True)
 
 step = 0
 training = True
@@ -95,18 +96,19 @@ while training:
 
         G_frame = generator(input_frames)
 
-        if not args.flownet2sd:
+        if train_cfg.flownet == 'lite':
             gt_flow_input = torch.cat([input_last, target_frame], 1)
             pred_flow_input = torch.cat([input_last, G_frame], 1)
             flow_gt = flow_net.batch_estimate(gt_flow_input, flow_net)
             flow_pred = flow_net.batch_estimate(pred_flow_input, flow_net)
             # TODO: only can in lite_flownet now, change it.
-            if args.show_flow:
+            if train_cfg.show_flow:
                 flow = np.array(flow_gt.cpu().detach().numpy().transpose(0, 2, 3, 1), np.float32)  # to (n, w, h, 2)
                 for i in range(flow.shape[0]):
                     aa = flow_to_color(flow[i], convert_to_bgr=False)
                     path = train_cfg.train_data.split('/')[-3] + '_' + flow_strs[i]
                     cv2.imwrite(f'images/{path}.jpg', aa)  # e.g. images/avenue_4_574-575.jpg
+                    print(f'Saved a sample optic flow image from gt frames: \'images/{path}.jpg\'.')
 
         else:
             gt_flow_input = torch.cat([input_last.unsqueeze(2), target_frame.unsqueeze(2)], 2)  # (2, 3, 2, 256, 256)
@@ -139,12 +141,18 @@ while training:
             elapsed += iter_t
         temp = time_end
 
-        if step % 10 == 0:
+        if step % 20 == 0:
             time_reamin = (train_cfg.iters - step) / step * elapsed
             eta = str(datetime.timedelta(seconds=time_reamin)).split('.')[0]
             psnr = psnr_error(G_frame, target_frame)
             print(f"[{step}]  inte_l: {inte_l:.3f} | grad_l: {grad_l:.3f} | fl_l: {fl_l:.3f} | g_l: {g_l:.3f} | "
                   f"G_l_total: {G_l_total:.3f} | D_l: {D_l:.3f} | psnr: {psnr:.3f} | iter: {iter_t:.3f}s | ETA: {eta}")
+
+            save_G_frame = ((G_frame[0] + 1) * 127.5).permute(1, 2, 0)
+            save_G_frame = save_G_frame.cpu().detach().numpy().astype('uint8')[..., (2, 1, 0)]
+
+            save_target = ((target_frame[0] + 1) * 127.5).permute(1, 2, 0)
+            save_target = save_target.cpu().detach().numpy().astype('uint8')[..., (2, 1, 0)]
 
             writer.add_scalar('psnr/train_psnr', psnr, global_step=step)
             writer.add_scalar('total_loss/g_loss_total', G_l_total, global_step=step)
@@ -153,22 +161,24 @@ while training:
             writer.add_scalar('G_loss_total/fl_loss', fl_l, global_step=step)
             writer.add_scalar('G_loss_total/inte_loss', inte_l, global_step=step)
             writer.add_scalar('G_loss_total/grad_loss', grad_l, global_step=step)
-            writer.add_image('image/train_target', target_frame[0], global_step=step)
-            writer.add_image('image/train_output', G_frame[0], global_step=step)
+            writer.add_scalar('psnr/train_psnr', psnr, global_step=step)
 
-        if step % 5000 == 0:
+        if step % int(train_cfg.iters / 100) == 0:
+            writer.add_image('image/G_frame', save_G_frame, global_step=step)
+            writer.add_image('image/target', save_target, global_step=step)
+
+        if step % train_cfg.save_interval == 0:
             g_dict = {'net': generator.state_dict(), 'optimizer': optimizer_G.state_dict()}
             d_dict = {'net': discriminator.state_dict(), 'optimizer': optimizer_D.state_dict()}
             torch.save(g_dict, f'weights/G_{train_cfg.dataset}_{step}.pth')
             torch.save(d_dict, f'weights/D_{train_cfg.dataset}_{step}.pth')
             print(f'\nAlready saved \'G_{train_cfg.dataset}_{step}.pth\', \'D_{train_cfg.dataset}_{step}.pth\'.')
 
-        if step > args.iters:
+        if step % train_cfg.val_interval == 0:
+            auc = val(train_cfg, model=generator)
+            writer.add_scalar('results/auc', auc, global_step=step)
+            generator.train()
+
+        if step > train_cfg.iters:
             training = False
             break
-            #     if step >= 2000:
-            #         print('==== begin evaluate the model of {} ===='.format(generator_model + '-' + str(step)))
-            #
-            #         auc = evaluate(frame_num=5, input_channels=12, output_channels=3,
-            #                        model_path=generator_model + '-' + str(step))
-            #         writer.add_scalar('results/auc', auc, global_step=step)

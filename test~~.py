@@ -39,6 +39,73 @@ import torch.nn as nn
 # loss.backward()
 # print(net.x2.grad)
 
+# import matplotlib.pyplot as plt
+# import time
+# from math import *
+#
+# plt.figure(1)
+#
+# t = []
+# m = []
+#
+# for i in range(2000):
+#     plt.clf()  # 清空画布上的所有内容
+#
+#     t_now = i * 0.1
+#
+#     t.append(t_now)  # 模拟数据增量流入，保存历史数据
+#     m.append(sin(t_now))  # 模拟数据增量流入，保存历史数据
+#
+#     aa = time.time()
+#     if i > 1:
+#         print(aa - temp)
+#     temp = aa
+#
+#     plt.plot(t, m, '-r')
+#     plt.pause(0.0001)
 
-aa =[1,2,4]
-print(min(aa))
+import math
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+
+def beta_pdf(x, a, b):
+    return (x ** (a - 1) * (1 - x) ** (b - 1) * math.gamma(a + b)
+            / (math.gamma(a) * math.gamma(b)))
+
+
+class UpdateDist(object):
+    def __init__(self, ax):
+        self.success = 0
+        self.line, = ax.plot([], [], 'k-')
+        self.x = np.linspace(0, 1, 200)
+
+    def __call__(self, i):
+        print(i)
+        # This way the plot can continuously run and we just keep
+        # watching new realizations of the process
+
+        y = beta_pdf(self.x, self.success + 1, (i - self.success) + 1)
+
+        self.line.set_data(self.x, y)
+
+        return self.line,
+
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
+fig, ax = plt.subplots()
+ax.set_xlim(0, 1)
+ax.set_ylim(0, 15)
+ax.grid(True)
+
+ud = UpdateDist(ax)
+
+anim = FuncAnimation(fig, ud, frames=np.arange(100), interval=50, blit=True)
+
+plt.show()
+
+

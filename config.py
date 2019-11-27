@@ -35,8 +35,15 @@ def update_config(args=None, mode=None):
         share_config['g_lr'] = 0.0002 if args.color_type == 'colorful' else 0.0001
         share_config['d_lr'] = 0.00002 if args.color_type == 'colorful' else 0.00001
         share_config['iters'] = args.iters
+        share_config['show_flow'] = args.show_flow
+        share_config['save_interval'] = args.save_interval
+        share_config['val_interval'] = args.val_interval
+        share_config['flownet'] = args.flownet
 
     elif mode == 'test':
         share_config['test_data'] = share_config['data_root'] + args.dataset + '/testing/frames'
+        share_config['trained_g'] = args.trained_g
+        share_config['show_curve'] = args.show_curve
+        share_config['show_heatmap'] = args.show_heatmap
 
     return dict2class(share_config)  # change dict keys to class attributes

@@ -55,16 +55,16 @@ class test_dataset:
     def __init__(self, video_folder, clip_length, size=(256, 256)):
         self.clip_length = clip_length
         self.img_height, self.img_width = size
-        self.pics = glob.glob(video_folder + '/*.jpg')
-        self.pics.sort()
+        self.imgs = glob.glob(video_folder + '/*.jpg')
+        self.imgs.sort()
 
     def __len__(self):
-        return len(self.pics) - 4  # The first 4 frames are unpredictable, so here minus 4.
+        return len(self.imgs) - 4  # The first 4 frames are unpredictable, so here minus 4.
 
     def __getitem__(self, indice):
         video_clips = []
         for frame_id in range(indice, indice + self.clip_length):
-            video_clips.append(np_load_frame(self.pics[frame_id], self.img_height, self.img_width))
+            video_clips.append(np_load_frame(self.imgs[frame_id], self.img_height, self.img_width))
 
         video_clips = np.array(video_clips).reshape((-1, self.img_height, self.img_width))
         video_clips = torch.from_numpy(video_clips)
@@ -83,12 +83,11 @@ class Label_loader:
     #                        PED1: os.path.join(DATA_DIR, 'ped1/testing/frames'),
     #                        PED2: os.path.join(DATA_DIR, 'ped2/testing/frames')}
 
-    def __init__(self, test_cfg, video_folders):
-        self.name = test_cfg.dataset
-        assert self.name in ('ped2', 'avenue', 'shanghaitech'), f'Did not find the related gt for \'{self.name}\'.'
-
-        self.frame_path = test_cfg.test_data
-        self.mat_path = f'{test_cfg.data_root + self.name}/{self.name}.mat'
+    def __init__(self, cfg, video_folders):
+        assert cfg.dataset in ('ped2', 'avenue', 'shanghaitech'), f'Did not find the related gt for \'{cfg.dataset}\'.'
+        self.name = cfg.dataset
+        self.frame_path = cfg.test_data
+        self.mat_path = f'{cfg.data_root + self.name}/{self.name}.mat'
         self.video_folders = video_folders
 
     def __call__(self):
@@ -103,7 +102,7 @@ class Label_loader:
 
         all_gt = []
         for i in range(abnormal_events.shape[0]):
-            length = len(os.listdir(self.frame_path + '/' + self.video_folders[i]))
+            length = len(os.listdir(self.video_folders[i]))
             sub_video_gt = np.zeros((length,), dtype=np.int8)
 
             one_abnormal = abnormal_events[i]
