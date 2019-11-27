@@ -41,13 +41,13 @@ discriminator = PixelDiscriminator(input_nc=color_c).cuda()
 
 if args.resume_g:
     generator.load_state_dict(torch.load(args.resume_g))
-    print(f'Pre-trained generator loaded with {args.resume_g}.')
+    print(f'Pre-trained generator loaded with \'weights/{args.resume_g}\'.')
 else:
     generator.apply(weights_init_normal)
     print('Generator is going to be trained from scratch.')
 if args.resume_d:
     discriminator.load_state_dict(torch.load(args.resume_d))
-    print(f'Pre-trained discriminator loaded with {args.resume_d}.')
+    print(f'Pre-trained discriminator loaded with \'weights/{args.resume_d}\'.')
 else:
     discriminator.apply(weights_init_normal)
     print('Discriminator is going to be trained from scratch.')

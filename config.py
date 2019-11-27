@@ -37,6 +37,6 @@ def update_config(args=None, mode=None):
         share_config['iters'] = args.iters
 
     elif mode == 'test':
-        share_config['test_data'] = share_config['test_data'].replace('avenue', args.dataset)
+        share_config['test_data'] = share_config['data_root'] + args.dataset + '/testing/frames'
 
     return dict2class(share_config)  # change dict keys to class attributes

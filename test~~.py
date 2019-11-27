@@ -38,8 +38,7 @@ import torch.nn as nn
 #
 # loss.backward()
 # print(net.x2.grad)
-import numpy as np
 
-for i in range(20):
-    start = np.random.randint(0, 5, 3)
-    print(start)
+
+aa =[1,2,4]
+print(min(aa))

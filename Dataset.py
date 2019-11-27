@@ -53,14 +53,13 @@ class train_dataset(Dataset):
 
 class test_dataset:
     def __init__(self, video_folder, clip_length, size=(256, 256)):
-        self.path = video_folder
         self.clip_length = clip_length
         self.img_height, self.img_width = size
-        self.pics = glob.glob(self.path + '/*.jpg')
+        self.pics = glob.glob(video_folder + '/*.jpg')
         self.pics.sort()
 
     def __len__(self):
-        return len(self.pics) - 4
+        return len(self.pics) - 4  # The first 4 frames are unpredictable, so here minus 4.
 
     def __getitem__(self, indice):
         video_clips = []
@@ -72,101 +71,63 @@ class test_dataset:
         return video_clips
 
 
-class label_loader:
-    DATA_DIR = '/home/feiyu/Data/'
-    AVENUE = 'avenue'
-    PED1 = 'ped1'
-    PED2 = 'ped2'
+class Label_loader:
 
-    SHANGHAITECH = 'shanghaitech'
-    SHANGHAITECH_LABEL_PATH = os.path.join(DATA_DIR, 'shanghaitech/testing/test_frame_mask')
+    # SHANGHAITECH_LABEL_PATH = os.path.join(DATA_DIR, 'shanghaitech/testing/test_frame_mask')
+    #
+    # NAME_MAT_MAPPING = {AVENUE: os.path.join(DATA_DIR, 'avenue/avenue.mat'),
+    #                     PED1: os.path.join(DATA_DIR, 'ped1/ped1.mat'),
+    #                     PED2: os.path.join(DATA_DIR, 'ped2/ped2.mat')}
+    #
+    # NAME_FRAMES_MAPPING = {AVENUE: os.path.join(DATA_DIR, 'avenue/testing/frames'),
+    #                        PED1: os.path.join(DATA_DIR, 'ped1/testing/frames'),
+    #                        PED2: os.path.join(DATA_DIR, 'ped2/testing/frames')}
 
-    NAME_MAT_MAPPING = {AVENUE: os.path.join(DATA_DIR, 'avenue/avenue.mat'),
-                        PED1: os.path.join(DATA_DIR, 'ped1/ped1.mat'),
-                        PED2: os.path.join(DATA_DIR, 'ped2/ped2.mat')}
+    def __init__(self, test_cfg, video_folders):
+        self.name = test_cfg.dataset
+        assert self.name in ('ped2', 'avenue', 'shanghaitech'), f'Did not find the related gt for \'{self.name}\'.'
 
-    NAME_FRAMES_MAPPING = {AVENUE: os.path.join(DATA_DIR, 'avenue/testing/frames'),
-                           PED1: os.path.join(DATA_DIR, 'ped1/testing/frames'),
-                           PED2: os.path.join(DATA_DIR, 'ped2/testing/frames')}
+        self.frame_path = test_cfg.test_data
+        self.mat_path = f'{test_cfg.data_root + self.name}/{self.name}.mat'
+        self.video_folders = video_folders
 
-    def __init__(self):
-        self.mapping = label_loader.NAME_MAT_MAPPING
-
-    def __call__(self, dataset):
-        """ get the ground truth by provided the name of dataset.
-
-        :type dataset: str
-        :param dataset: the name of dataset.
-        :return: np.ndarray, shape(#video)
-                 np.array[0] contains all the start frame and end frame of abnormal events of video 0,
-                 and its shape is (#frapsnr, )
-        """
-
-        if dataset == label_loader.SHANGHAITECH:
+    def __call__(self):
+        if self.name == 'shanghaitech':
             gt = self.__load_shanghaitech_gt()
         else:
-            gt = self.load_ucsd_avenue_gt(dataset)
+            gt = self.load_ucsd_avenue_gt()
         return gt
 
-    def load_ucsd_avenue_gt(self, dataset):
-        assert dataset in self.mapping, 'there is no dataset named {} \n Please check {}' \
-            .format(dataset, label_loader.NAME_MAT_MAPPING.keys())
+    def load_ucsd_avenue_gt(self):
+        abnormal_events = scio.loadmat(self.mat_path, squeeze_me=True)['gt']
 
-        mat_file = self.mapping[dataset]
-        abnormal_events = scio.loadmat(mat_file, squeeze_me=True)['gt']
-
-        if abnormal_events.ndim == 2:
-            abnormal_events = abnormal_events.reshape(-1, abnormal_events.shape[0], abnormal_events.shape[1])
-
-        num_video = abnormal_events.shape[0]
-        dataset_video_folder = label_loader.NAME_FRAMES_MAPPING[dataset]
-        video_list = os.listdir(dataset_video_folder)
-        video_list.sort()
-
-        assert num_video == len(video_list), 'ground true does not match the number of testing videos. {} != {}' \
-            .format(num_video, len(video_list))
-
-        # get the total frames of sub video
-        def get_video_length(sub_video_number):
-            # video_name = video_name_template.format(sub_video_number)
-            video_name = os.path.join(dataset_video_folder, video_list[sub_video_number])
-            assert os.path.isdir(video_name), '{} is not directory!'.format(video_name)
-
-            length = len(os.listdir(video_name))
-
-            return length
-
-        # need to test [].append, or np.array().append(), which one is faster
-        gt = []
-        for i in range(num_video):
-            length = get_video_length(i)
-
+        all_gt = []
+        for i in range(abnormal_events.shape[0]):
+            length = len(os.listdir(self.frame_path + '/' + self.video_folders[i]))
             sub_video_gt = np.zeros((length,), dtype=np.int8)
-            sub_abnormal_events = abnormal_events[i]
-            if sub_abnormal_events.ndim == 1:
-                sub_abnormal_events = sub_abnormal_events.reshape((sub_abnormal_events.shape[0], -1))
 
-            _, num_abnormal = sub_abnormal_events.shape
+            one_abnormal = abnormal_events[i]
+            if one_abnormal.ndim == 1:
+                one_abnormal = one_abnormal.reshape((one_abnormal.shape[0], -1))
 
-            for j in range(num_abnormal):
-                # (start - 1, end - 1)
-                start = sub_abnormal_events[0, j] - 1
-                end = sub_abnormal_events[1, j]
+            for j in range(one_abnormal.shape[1]):
+                start = one_abnormal[0, j] - 1
+                end = one_abnormal[1, j]
 
                 sub_video_gt[start: end] = 1
 
-            gt.append(sub_video_gt)
+            all_gt.append(sub_video_gt)
 
-        return gt
+        return all_gt
 
     @staticmethod
     def __load_shanghaitech_gt():
-        video_path_list = os.listdir(label_loader.SHANGHAITECH_LABEL_PATH)
+        video_path_list = os.listdir(Label_loader.SHANGHAITECH_LABEL_PATH)
         video_path_list.sort()
 
         gt = []
         for video in video_path_list:
             # print(os.path.join(GroundTruthLoader.SHANGHAITECH_LABEL_PATH, video))
-            gt.append(np.load(os.path.join(label_loader.SHANGHAITECH_LABEL_PATH, video)))
+            gt.append(np.load(os.path.join(Label_loader.SHANGHAITECH_LABEL_PATH, video)))
 
         return gt

@@ -1,6 +1,5 @@
 import Dataset
 from models.unet import UNet
-from torch.utils.data import DataLoader
 import numpy as np
 from utils import psnr_error
 import os
@@ -9,7 +8,7 @@ import torch
 import argparse
 from config import update_config
 from sklearn import metrics
-from Dataset import label_loader
+from Dataset import Label_loader
 import pdb
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
@@ -25,78 +24,60 @@ test_cfg.print_cfg()
 
 def evaluate(cfg):
     generator = UNet(input_channels=12, output_channel=3).cuda().eval()
+    generator.load_state_dict(torch.load('weights/' + args.trained_g)['net'])
+    print(f'The pre-trained generator has been loaded with \'weights/{args.trained_g}\'.\n')
+
     video_folders = os.listdir(cfg.test_data)
     video_folders.sort()
 
-    time_stamp = time.time()
-
-    psnr_records = []
-    total = 0
-    generator.load_state_dict(torch.load('weights/' + args.trained_g)['net'])
-
-    for folder in video_folders:
+    psnr_groups = []
+    for i, folder in enumerate(video_folders):
         one_folder = os.path.join(cfg.test_data, folder)
         dataset = Dataset.test_dataset(one_folder, clip_length=5)
 
-        test_iters = len(dataset) - 5 + 1
-        test_counter = 0
+        psnrs = []
+        for j, clip in enumerate(dataset):
+            start = time.time()
+            torch.cuda.synchronize()
 
-        data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=1)
-
-        psnrs = np.empty(shape=(len(dataset),), dtype=np.float32)
-        for test_input in data_loader:
-            input_frames = test_input[:, 0:12, :, :].cuda()
-            target_frame = test_input[:, 12:15, :, :].cuda()
+            input_frames = clip[0:12, :, :].unsqueeze(0).cuda()
+            target_frame = clip[12:15, :, :].unsqueeze(0).cuda()
 
             G_frame = generator(input_frames)
-            test_psnr = psnr_error(G_frame, target_frame)
-            test_psnr = test_psnr.tolist()
-            pdb.set_trace()
+            test_psnr = psnr_error(G_frame, target_frame).cpu().detach().numpy()
+            psnrs.append(test_psnr)
 
-            psnrs[test_counter + 5 - 1] = test_psnr
+            end = time.time()
+            torch.cuda.synchronize()
+            print(f'\rDetecting: [{i:02d}] {j}/{len(dataset)}, {1 / (end - start):.2f} fps.', end='')
 
-            test_counter += 1
-            total += 1
-            if test_counter >= test_iters:
-                psnrs[:5 - 1] = psnrs[5 - 1]
-                psnr_records.append(psnrs)
-                print('finish test video set {}'.format(one_folder))
-                break
+        psnr_groups.append(psnrs)
+    print('\nAll frames were detected, begin to compute AUC.')
 
-    results = {'dataset': test_cfg.dataset, 'psnr': psnr_records, 'diff_mask': []}
+    gt_loader = Label_loader(test_cfg, video_folders)
+    gt = gt_loader()
 
-    used_time = time.time() - time_stamp
-    print('total time = {}, fps = {}'.format(used_time, total / used_time))
-
-    dataset = results['dataset']
-    psnr_records = results['psnr']
-
-    num_videos = len(psnr_records)
-
-    # load ground truth
-    gt_loader = label_loader()
-    gt = gt_loader(dataset=dataset)
-
-    assert num_videos == len(gt), 'the number of saved videos does not match the ground truth, {} != {}' \
-        .format(num_videos, len(gt))
+    detected_num = len(psnr_groups)
+    assert detected_num == len(gt), f'Ground truth has {len(gt)} videos, but got {detected_num} detected videos.'
 
     scores = np.array([], dtype=np.float32)
     labels = np.array([], dtype=np.int8)
+    for i in range(detected_num):
+        distance = psnr_groups[i]
+        distance -= min(distance)  # distance = (distance - min) / (max - min)
+        distance /= max(distance)
 
-    for i in range(num_videos):
-        distance = psnr_records[i]
-        distance -= distance.min()  # distances = (distance - min) / (max - min)
-        distance /= distance.max()
-
-        scores = np.concatenate((scores, distance[4:]), axis=0)  # The first 4 frames are unpredictable.
-        labels = np.concatenate((labels, gt[i][4:]), axis=0)
+        scores = np.concatenate((scores, distance), axis=0)
+        labels = np.concatenate((labels, gt[i][4:]), axis=0)  # Exclude the first 4 unpredictable frames in gt.
 
     fpr, tpr, thresholds = metrics.roc_curve(labels, scores, pos_label=0)
     auc = metrics.auc(fpr, tpr)
-    print(auc)
+    print(f'AUC: {auc}')
 
 
 if __name__ == '__main__':
+    evaluate(test_cfg)
+    # Uncomment this to test the AUC mechanism.
     # labels = [0,  0,   0,   0,   0,  1,   1,    1,   0,  1,   0,    0]
     # scores = [0, 1/8, 2/8, 1/8, 1/8, 3/8, 6/8, 7/8, 5/8, 8/8, 2/8, 1/8]
     # fpr, tpr, thresholds = metrics.roc_curve(labels, scores, pos_label=1)
@@ -106,4 +87,3 @@ if __name__ == '__main__':
     # print('~~~~~~~~~~~~`')
     # print(thresholds)
     # print('~~~~~~~~~~~~`')
-    evaluate(test_cfg)

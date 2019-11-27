@@ -66,7 +66,7 @@ class Discriminate_Loss(nn.Module):
 
 
 # if __name__ == '__main__':
-#     # Debug Gradient_Loss
+#     # Debug Gradient_Loss, mainly on the padding issue.
 #     import numpy as np
 #
 #     aa = torch.tensor([[1, 2, 3, 4, 2],
