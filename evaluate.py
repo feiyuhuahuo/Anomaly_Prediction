@@ -1,30 +1,30 @@
-import Dataset
-from models.unet import UNet
 import numpy as np
-from utils import psnr_error
 import os
 import time
 import torch
 import argparse
 import cv2
-from config import update_config
 from sklearn import metrics
-from Dataset import Label_loader
 import matplotlib.pyplot as plt
+
+from config import update_config
+from Dataset import Label_loader
+from utils import psnr_error
+import Dataset
+from models.unet import UNet
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
 parser.add_argument('--dataset', default='avenue', type=str, help='The name of the dataset to train.')
 parser.add_argument('--input_num', default='4', type=int, help='The frame number to be used to predict one frame.')
 parser.add_argument('--color_type', default='colorful', type=str, help='The color type of the dataset.')
 parser.add_argument('--trained_g', default='G_80000.pth', type=str, help='The pre-trained generator to evaluate.')
-parser.add_argument('--show_curve', action='store_true',
-                    help='Show the psnr curve real-timely, this drops fps.')
+parser.add_argument('--show_curve', action='store_true', help='Show the psnr curve real-timely, this drops fps.')
 parser.add_argument('--show_heatmap', action='store_true',
                     help='Show the difference heatmap real-timely, this drops fps.')
 
 
 def val(cfg, model=None):
-    if model:
+    if model:  # This is for testing during training.
         generator = model
         generator.eval()
     else:
@@ -57,7 +57,7 @@ def val(cfg, model=None):
         cv2.moveWindow('difference map', 100, 550)
 
     for i, folder in enumerate(video_folders):
-        dataset = Dataset.test_dataset(folder, clip_length=5)
+        dataset = Dataset.test_dataset(cfg, folder)
 
         if cfg.show_curve:
             js = []
@@ -108,7 +108,7 @@ def val(cfg, model=None):
         psnr_groups.append(psnrs)
     print('\nAll frames were detected, begin to compute AUC.')
 
-    gt_loader = Label_loader(cfg, video_folders)
+    gt_loader = Label_loader(cfg, video_folders)  # Get gt labels.
     gt = gt_loader()
 
     detected_num = len(psnr_groups)

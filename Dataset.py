@@ -7,9 +7,9 @@ import scipy.io as scio
 from torch.utils.data import Dataset
 
 
-def np_load_frame(filename, resize_height, resize_width):
-    image_decoded = cv2.imread(filename)
-    image_resized = cv2.resize(image_decoded, (resize_width, resize_height)).astype('float32')
+def np_load_frame(filename, resize_h, resize_w):
+    img = cv2.imread(filename)
+    image_resized = cv2.resize(img, (resize_w, resize_h)).astype('float32')
     image_resized = (image_resized / 127.5) - 1.0  # to -1 ~ 1
     image_resized = np.transpose(image_resized, [2, 0, 1])  # to (C, W, H)
     return image_resized
@@ -21,13 +21,13 @@ class train_dataset(Dataset):
     Normalized from [0, 255] to [-1, 1], the channels are BGR due to cv2 and liteFlownet.
     """
 
-    def __init__(self, dataset_folder, clip_length, size=(256, 256)):
-        self.image_height = size[0]
-        self.image_width = size[1]
-        self.clip_length = clip_length
+    def __init__(self, cfg):
+        self.img_h = cfg.img_size[0]
+        self.img_w = cfg.img_size[1]
+        self.clip_length = cfg.input_num + 1
 
         self.videos = []
-        for folder in sorted(glob.glob(f'{dataset_folder}/*')):
+        for folder in sorted(glob.glob(f'{cfg.train_data}/*')):
             all_imgs = glob.glob(f'{folder}/*.jpg')
             all_imgs.sort()
             self.videos.append(all_imgs)
@@ -36,15 +36,15 @@ class train_dataset(Dataset):
         return len(self.videos)
 
     def __getitem__(self, indice):
-        # When getting frames, 5 frames are one unit, shuffle across all video folders and all frames in one folder.
+        # When getting video clips, shuffle across all video folders and all frames in one folder.
         one_folder = self.videos[indice]
         start = np.random.randint(0, len(one_folder) - self.clip_length)
         video_clip = []
 
         for i in range(start, start + self.clip_length):
-            video_clip.append(np_load_frame(one_folder[i], self.image_height, self.image_width))
+            video_clip.append(np_load_frame(one_folder[i], self.img_h, self.img_w))
 
-        video_clip = np.array(video_clip).reshape((-1, self.image_height, self.image_width))
+        video_clip = np.array(video_clip).reshape((-1, self.img_h, self.img_w))
         video_clip = torch.from_numpy(video_clip)
 
         flow_str = f'{indice}_{start + 3}-{start + 4}'
@@ -52,21 +52,22 @@ class train_dataset(Dataset):
 
 
 class test_dataset:
-    def __init__(self, video_folder, clip_length, size=(256, 256)):
-        self.clip_length = clip_length
-        self.img_height, self.img_width = size
+    def __init__(self, cfg, video_folder):
+        self.img_h = cfg.img_size[0]
+        self.img_w = cfg.img_size[1]
+        self.clip_length = cfg.input_num + 1
         self.imgs = glob.glob(video_folder + '/*.jpg')
         self.imgs.sort()
 
     def __len__(self):
-        return len(self.imgs) - 4  # The first 4 frames are unpredictable, so here minus 4.
+        return len(self.imgs) - (self.clip_length - 1)  # The first [input_num] frames are unpredictable.
 
     def __getitem__(self, indice):
         video_clips = []
         for frame_id in range(indice, indice + self.clip_length):
-            video_clips.append(np_load_frame(self.imgs[frame_id], self.img_height, self.img_width))
+            video_clips.append(np_load_frame(self.imgs[frame_id], self.img_h, self.img_w))
 
-        video_clips = np.array(video_clips).reshape((-1, self.img_height, self.img_width))
+        video_clips = np.array(video_clips).reshape((-1, self.img_h, self.img_w))
         return video_clips
 
 

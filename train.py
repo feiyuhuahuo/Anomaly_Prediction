@@ -1,34 +1,36 @@
+import cv2
+import time
+import datetime
+from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader
+import argparse
+
 from utils import *
 from losses import *
 import Dataset
 from models.unet import UNet
 from models.pix2pix_networks import PixelDiscriminator
 from liteFlownet import lite_flownet as lite_flow
-from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
-import argparse
-import time
-import datetime
 from config import update_config
 from flownet2.models import FlowNet2SD
-import cv2
 from evaluate import val
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
-parser.add_argument('--batch_size', default=2, type=int)
+parser.add_argument('--batch_size', default=4, type=int)
 parser.add_argument('--dataset', default='avenue', type=str, help='The name of the dataset to train.')
+parser.add_argument('--img_size', default=(256, 256), type=tuple, help='The image size for training and evaluating.')
 parser.add_argument('--color_type', default='colorful', type=str, help='The color type of the dataset.')
+parser.add_argument('--input_num', default='4', type=int, help='The frame number to be used to predict one frame.')
+parser.add_argument('--iters', default=80000, type=int, help='The total iteration number.')
 parser.add_argument('--resume_g', default=None, type=str,
                     help='The path of the pre-trained generator model to resume training with.')
 parser.add_argument('--resume_d', default=None, type=str,
                     help='The path of the pre-trained discriminator model to resume training with.')
-parser.add_argument('--input_num', default='4', type=int, help='The frame number to be used to predict one frame.')
-parser.add_argument('--iters', default='80000', type=int, help='The total iteration number.')
-parser.add_argument('--show_flow', default=False, action='store_true',
-                    help='If True, the first batch of ground truth optic flow could be visualized and saved.')
 parser.add_argument('--save_interval', default=5000, type=int, help='Save the model every [save_interval] iterations.')
 parser.add_argument('--val_interval', default=10000, type=int,
                     help='Evaluate the model every [val_interval] iterations, pass -1 to disable.')
+parser.add_argument('--show_flow', default=False, action='store_true',
+                    help='If True, the first batch of ground truth optic flow could be visualized and saved.')
 parser.add_argument('--flownet', default='lite', type=str, help='lite: LiteFlownet, 2sd: FlowNet2SD.')
 
 args = parser.parse_args()
@@ -45,6 +47,7 @@ if args.resume_g:
 else:
     generator.apply(weights_init_normal)
     print('Generator is going to be trained from scratch.')
+
 if args.resume_d:
     discriminator.load_state_dict(torch.load(args.resume_d))
     print(f'Pre-trained discriminator loaded with \'weights/{args.resume_d}\'.')
@@ -73,25 +76,22 @@ intensity_loss = Intensity_Loss().cuda()
 writer = SummaryWriter('tensorboard_log')
 
 # TODO: the grey image can still be read as 3 channels, how to decide the channel issue?
-train_dataset = Dataset.train_dataset(train_cfg.train_data, train_cfg.input_num + 1)
-test_dataset = Dataset.train_dataset(train_cfg.test_data, train_cfg.input_num + 1)
+train_dataset = Dataset.train_dataset(train_cfg)
 # Remember to set drop_last=True, because we need to use 4 frames to predict one frame.
 train_dataloader = DataLoader(dataset=train_dataset, batch_size=train_cfg.batch_size,
                               shuffle=True, num_workers=4, drop_last=True)
 
 step = 0
-training = True
 elapsed = 0.
-time_start = 0.
+training = True
+generator = generator.train()
+discriminator = discriminator.train()
 while training:
-    for five_frames, flow_strs in train_dataloader:
+    for clips, flow_strs in train_dataloader:
         step += 1
 
-        generator = generator.train()
-        discriminator = discriminator.train()
-
-        input_frames = five_frames[:, 0:12, :, :].cuda()  # (n, 12, 256, 256)
-        target_frame = five_frames[:, 12:15, :, :].cuda()  # (n, 3, 256, 256)
+        input_frames = clips[:, 0:12, :, :].cuda()  # (n, 12, 256, 256)
+        target_frame = clips[:, 12:15, :, :].cuda()  # (n, 3, 256, 256)
         input_last = input_frames[:, 9:12, :, :].cuda()  # use for flow_loss
 
         G_frame = generator(input_frames)
