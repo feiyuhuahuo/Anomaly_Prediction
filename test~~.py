@@ -36,76 +36,17 @@ import torch.nn as nn
 # out = net(aa)
 # loss = torch.sum((out - 1) ** 2)
 #
-# loss.backward()
+# loss.backward() ⬃⬆ ⇩↧⬋属于Miscellaneous Symbols and Arrows杂项符号和箭头该分区共有256个，ASCII码为：&#11019,想了解更多内容请来https://www.ziti163.com/uni
 # print(net.x2.grad)
 
-# import matplotlib.pyplot as plt
-# import time
-# from math import *
-#
-# plt.figure(1)
-#
-# t = []
-# m = []
-#
-# for i in range(2000):
-#     plt.clf()  # 清空画布上的所有内容
-#
-#     t_now = i * 0.1
-#
-#     t.append(t_now)  # 模拟数据增量流入，保存历史数据
-#     m.append(sin(t_now))  # 模拟数据增量流入，保存历史数据
-#
-#     aa = time.time()
-#     if i > 1:
-#         print(aa - temp)
-#     temp = aa
-#
-#     plt.plot(t, m, '-r')
-#     plt.pause(0.0001)
+import cv2
 
-import math
+cv2.namedWindow('aa', cv2.WINDOW_NORMAL)
+cv2.resizeWindow('aa', 500, 500)
+cv2.moveWindow("aa", 600, 100)
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+im_gray = cv2.imread("1.jpg", cv2.IMREAD_GRAYSCALE)
+im_color = cv2.applyColorMap(im_gray, cv2.COLORMAP_JET)
 
-
-def beta_pdf(x, a, b):
-    return (x ** (a - 1) * (1 - x) ** (b - 1) * math.gamma(a + b)
-            / (math.gamma(a) * math.gamma(b)))
-
-
-class UpdateDist(object):
-    def __init__(self, ax):
-        self.success = 0
-        self.line, = ax.plot([], [], 'k-')
-        self.x = np.linspace(0, 1, 200)
-
-    def __call__(self, i):
-        print(i)
-        # This way the plot can continuously run and we just keep
-        # watching new realizations of the process
-
-        y = beta_pdf(self.x, self.success + 1, (i - self.success) + 1)
-
-        self.line.set_data(self.x, y)
-
-        return self.line,
-
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
-fig, ax = plt.subplots()
-ax.set_xlim(0, 1)
-ax.set_ylim(0, 15)
-ax.grid(True)
-
-ud = UpdateDist(ax)
-
-anim = FuncAnimation(fig, ud, frames=np.arange(100), interval=50, blit=True)
-
-plt.show()
-
-
+cv2.imshow('aa', im_color)
+cv2.waitKey()

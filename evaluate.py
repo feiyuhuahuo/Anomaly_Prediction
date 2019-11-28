@@ -6,11 +6,11 @@ import os
 import time
 import torch
 import argparse
+import cv2
 from config import update_config
 from sklearn import metrics
 from Dataset import Label_loader
 import matplotlib.pyplot as plt
-import pdb
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
 parser.add_argument('--dataset', default='avenue', type=str, help='The name of the dataset to train.')
@@ -18,9 +18,9 @@ parser.add_argument('--input_num', default='4', type=int, help='The frame number
 parser.add_argument('--color_type', default='colorful', type=str, help='The color type of the dataset.')
 parser.add_argument('--trained_g', default='G_80000.pth', type=str, help='The pre-trained generator to evaluate.')
 parser.add_argument('--show_curve', action='store_true',
-                    help='Show the psnr curve real-timely, slightly influence fps.')
+                    help='Show the psnr curve real-timely, this drops fps.')
 parser.add_argument('--show_heatmap', action='store_true',
-                    help='Show the difference heatmap real-timely, slightly influence fps.')
+                    help='Show the difference heatmap real-timely, this drops fps.')
 
 
 def val(cfg, model=None):
@@ -38,24 +38,65 @@ def val(cfg, model=None):
 
     fps = 0
     psnr_groups = []
-    for i, folder in enumerate(video_folders):
-        dataset = Dataset.test_dataset(folder, clip_length=5)
+
+    if cfg.show_curve:
+        fig = plt.get_current_fig_manager()
+        fig.window.setGeometry(550, 200, 600, 400)  # This works for QT backend, for other backends, check this ⬃⬃⬃.
+        # https://stackoverflow.com/questions/7449585/how-do-you-set-the-absolute-position-of-figure-windows-with-matplotlib
         plt.xlabel('frames')
         plt.ylabel('psnr')
-        plt.xlim((0, len(dataset)))
-        plt.ylim((20, 60))
+        plt.grid(ls='--')
+
+        cv2.namedWindow('target frames', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('target frames', 384, 384)
+        cv2.moveWindow("target frames", 100, 100)
+
+    if cfg.show_heatmap:
+        cv2.namedWindow('difference map', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('difference map', 384, 384)
+        cv2.moveWindow('difference map', 100, 550)
+
+    for i, folder in enumerate(video_folders):
+        dataset = Dataset.test_dataset(folder, clip_length=5)
+
+        if cfg.show_curve:
+            js = []
+            plt.clf()
+            ax = plt.axes(xlim=(0, len(dataset)), ylim=(0, 50))
+            ax.set_title('difference heatmap')
+            line, = ax.plot([], [], '-b')
 
         psnrs = []
         for j, clip in enumerate(dataset):
-            input_frames = clip[0:12, :, :].unsqueeze(0).cuda()
-            target_frame = clip[12:15, :, :].unsqueeze(0).cuda()
+            input_np = clip[0:12, :, :]
+            target_np = clip[12:15, :, :]
+            input_frames = torch.from_numpy(input_np).unsqueeze(0).cuda()
+            target_frame = torch.from_numpy(target_np).unsqueeze(0).cuda()
 
             G_frame = generator(input_frames)
             test_psnr = psnr_error(G_frame, target_frame).cpu().detach().numpy()
-            psnrs.append(test_psnr)
+            psnrs.append(float(test_psnr))
 
-            plt.plot(i, m, '-r')
-            plt.pause(0.0001)
+            if cfg.show_curve:
+                cv2_frame = ((target_np + 1) * 127.5).transpose(1, 2, 0).astype('uint8')
+                cv2.imshow('target frames', cv2_frame)
+                cv2.waitKey(1)
+
+                js.append(j)
+                line.set_xdata(js)  # This keeps the existing figure and just updates the X-axis data and Y-axis data,
+                line.set_ydata(psnrs)  # which is faster, but still not perfect. Maybe multi-thread could be concerned.
+                plt.pause(0.001)
+
+            if cfg.show_heatmap:
+                diff_map = torch.sum(torch.abs(G_frame - target_frame).squeeze(), 0)
+                diff_map -= diff_map.min()
+                diff_map /= diff_map.max()
+                diff_map *= 255
+                diff_map = diff_map.cpu().detach().numpy().astype('uint8')
+
+                heat_map = cv2.applyColorMap(diff_map, cv2.COLORMAP_JET)
+                cv2.imshow('difference map', heat_map)
+                cv2.waitKey(1)
 
             torch.cuda.synchronize()
             end = time.time()

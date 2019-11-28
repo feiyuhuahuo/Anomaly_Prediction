@@ -67,7 +67,6 @@ class test_dataset:
             video_clips.append(np_load_frame(self.imgs[frame_id], self.img_height, self.img_width))
 
         video_clips = np.array(video_clips).reshape((-1, self.img_height, self.img_width))
-        video_clips = torch.from_numpy(video_clips)
         return video_clips
 
 
