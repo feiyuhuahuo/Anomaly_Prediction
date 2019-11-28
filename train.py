@@ -1,4 +1,5 @@
 import cv2
+import torch
 import time
 import datetime
 from tensorboardX import SummaryWriter
@@ -135,6 +136,7 @@ while training:
         G_l_total.backward()
         optimizer_G.step()
 
+        # torch.cuda.synchronize()
         time_end = time.time()
         if step > 1:  # This considers all the consumed time, including the testing time during training.
             iter_t = time_end - temp
@@ -148,10 +150,9 @@ while training:
             print(f"[{step}]  inte_l: {inte_l:.3f} | grad_l: {grad_l:.3f} | fl_l: {fl_l:.3f} | g_l: {g_l:.3f} | "
                   f"G_l_total: {G_l_total:.3f} | D_l: {D_l:.3f} | psnr: {psnr:.3f} | iter: {iter_t:.3f}s | ETA: {eta}")
 
-            save_G_frame = ((G_frame[0] + 1) * 127.5).permute(1, 2, 0)
+            save_G_frame = ((G_frame[0] + 1) * 127.5)
             save_G_frame = save_G_frame.cpu().detach().numpy().astype('uint8')[..., (2, 1, 0)]
-
-            save_target = ((target_frame[0] + 1) * 127.5).permute(1, 2, 0)
+            save_target = ((target_frame[0] + 1) * 127.5)
             save_target = save_target.cpu().detach().numpy().astype('uint8')[..., (2, 1, 0)]
 
             writer.add_scalar('psnr/train_psnr', psnr, global_step=step)
@@ -164,7 +165,7 @@ while training:
             writer.add_scalar('psnr/train_psnr', psnr, global_step=step)
 
         if step % int(train_cfg.iters / 100) == 0:
-            writer.add_image('image/G_frame', save_G_frame, global_step=step)
+            writer.add_image('image/G_frame', save_G_frame, global_step=step)  # Required channel order is (C, W, H).
             writer.add_image('image/target', save_target, global_step=step)
 
         if step % train_cfg.save_interval == 0:
