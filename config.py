@@ -1,5 +1,6 @@
 #!/usr/bin/env python 
 # -*- coding:utf-8 -*-
+import glob
 
 share_config = {'mode': 'training',
                 'dataset': 'avenue',
@@ -36,6 +37,7 @@ def update_config(args=None, mode=None):
         share_config['test_data'] = share_config['data_root'] + args.dataset + '/testing/frames'
         share_config['g_lr'] = 0.0002 if args.color_type == 'colorful' else 0.0001
         share_config['d_lr'] = 0.00002 if args.color_type == 'colorful' else 0.00001
+        share_config['resume'] = glob.glob(f'weights/{args.resume}*')[0] if args.resume else None
         share_config['iters'] = args.iters
         share_config['show_flow'] = args.show_flow
         share_config['save_interval'] = args.save_interval

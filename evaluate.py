@@ -30,7 +30,7 @@ def val(cfg, model=None):
     else:
         generator = UNet(input_channels=12, output_channel=3).cuda().eval()
         generator.load_state_dict(torch.load('weights/' + cfg.trained_g)['net'])
-        print(f'The pre-trained generator has been loaded with \'weights/{args.trained_g}\'.\n')
+        print(f'The pre-trained generator has been loaded with \'weights/{cfg.trained_g}\'.\n')
 
     video_folders = os.listdir(cfg.test_data)
     video_folders.sort()
@@ -39,7 +39,7 @@ def val(cfg, model=None):
     fps = 0
     psnr_groups = []
 
-    if cfg.show_curve:
+    if not model and cfg.show_curve:
         fig = plt.get_current_fig_manager()
         fig.window.setGeometry(550, 200, 600, 400)  # This works for QT backend, for other backends, check this ⬃⬃⬃.
         # https://stackoverflow.com/questions/7449585/how-do-you-set-the-absolute-position-of-figure-windows-with-matplotlib
@@ -51,7 +51,7 @@ def val(cfg, model=None):
         cv2.resizeWindow('target frames', 384, 384)
         cv2.moveWindow("target frames", 100, 100)
 
-    if cfg.show_heatmap:
+    if not model and cfg.show_heatmap:
         cv2.namedWindow('difference map', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('difference map', 384, 384)
         cv2.moveWindow('difference map', 100, 550)
@@ -59,7 +59,7 @@ def val(cfg, model=None):
     for i, folder in enumerate(video_folders):
         dataset = Dataset.test_dataset(cfg, folder)
 
-        if cfg.show_curve:
+        if not model and cfg.show_curve:
             js = []
             plt.clf()
             ax = plt.axes(xlim=(0, len(dataset)), ylim=(0, 50))
@@ -77,7 +77,7 @@ def val(cfg, model=None):
             test_psnr = psnr_error(G_frame, target_frame).cpu().detach().numpy()
             psnrs.append(float(test_psnr))
 
-            if cfg.show_curve:
+            if not model and cfg.show_curve:
                 cv2_frame = ((target_np + 1) * 127.5).transpose(1, 2, 0).astype('uint8')
                 cv2.imshow('target frames', cv2_frame)
                 cv2.waitKey(1)
@@ -87,7 +87,7 @@ def val(cfg, model=None):
                 line.set_ydata(psnrs)  # which is faster, but still not perfect. Maybe multi-thread could be concerned.
                 plt.pause(0.001)
 
-            if cfg.show_heatmap:
+            if not model and cfg.show_heatmap:
                 diff_map = torch.sum(torch.abs(G_frame - target_frame).squeeze(), 0)
                 diff_map -= diff_map.min()
                 diff_map /= diff_map.max()

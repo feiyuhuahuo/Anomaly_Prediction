@@ -38,15 +38,3 @@ import torch.nn as nn
 #
 # loss.backward() ⬃⬆ ⇩↧⬋属于Miscellaneous Symbols and Arrows杂项符号和箭头该分区共有256个，ASCII码为：&#11019,想了解更多内容请来https://www.ziti163.com/uni
 # print(net.x2.grad)
-
-import cv2
-
-cv2.namedWindow('aa', cv2.WINDOW_NORMAL)
-cv2.resizeWindow('aa', 500, 500)
-cv2.moveWindow("aa", 600, 100)
-
-im_gray = cv2.imread("1.jpg", cv2.IMREAD_GRAYSCALE)
-im_color = cv2.applyColorMap(im_gray, cv2.COLORMAP_JET)
-
-cv2.imshow('aa', im_color)
-cv2.waitKey()

@@ -1,5 +1,5 @@
-from flownet2 import FlowNetSD
-from flownet2.submodules import *
+from models.flownet2 import FlowNetSD
+from models.flownet2.submodules import *
 
 'Parameter count = 162,518,834'
 

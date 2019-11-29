@@ -2,7 +2,7 @@
 import torch
 import math
 import torch.nn
-from liteFlownet import correlation
+from models.liteFlownet import correlation
 import torch.nn.functional as F
 
 Backward_Grid = {}
