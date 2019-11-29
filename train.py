@@ -1,3 +1,5 @@
+import os
+from glob import glob
 import cv2
 import time
 import datetime
@@ -76,17 +78,14 @@ train_dataset = Dataset.train_dataset(train_cfg)
 train_dataloader = DataLoader(dataset=train_dataset, batch_size=train_cfg.batch_size,
                               shuffle=True, num_workers=4, drop_last=True)
 
-step = int(train_cfg.resume.split('_')[-1].split('.')[0]) if train_cfg.resume else 0
-elapsed = 0.
+start_iter = int(train_cfg.resume.split('_')[-1].split('.')[0]) if train_cfg.resume else 1
 training = True
 generator = generator.train()
 discriminator = discriminator.train()
-
 try:
+    step = start_iter
     while training:
         for clips, flow_strs in train_dataloader:
-            step += 1
-
             input_frames = clips[:, 0:12, :, :].cuda()  # (n, 12, 256, 256)
             target_frame = clips[:, 12:15, :, :].cuda()  # (n, 3, 256, 256)
             input_last = input_frames[:, 9:12, :, :].cuda()  # use for flow_loss
@@ -96,8 +95,9 @@ try:
             if train_cfg.flownet == 'lite':
                 gt_flow_input = torch.cat([input_last, target_frame], 1)
                 pred_flow_input = torch.cat([input_last, G_frame], 1)
-                flow_gt = flow_net.batch_estimate(gt_flow_input, flow_net)
-                flow_pred = flow_net.batch_estimate(pred_flow_input, flow_net)
+                # No need to train flow_net, use .detach() to cut off gradients.
+                flow_gt = flow_net.batch_estimate(gt_flow_input, flow_net).detach()
+                flow_pred = flow_net.batch_estimate(pred_flow_input, flow_net).detach()
                 # TODO: only can in lite_flownet now, change it.
                 if train_cfg.show_flow:
                     flow = np.array(flow_gt.cpu().detach().numpy().transpose(0, 2, 3, 1), np.float32)  # to (n, w, h, 2)
@@ -121,7 +121,7 @@ try:
             G_l_t = 1. * inte_l + 1. * grad_l + 2. * fl_l + 0.05 * g_l
 
             # Train discriminator
-            # When training discriminator, the weights of generator are fixed, so use .detach() to cut off gradients.
+            # When training discriminator, don't train generator, so use .detach() to cut off gradients.
             D_l = discriminate_loss(discriminator(target_frame), discriminator(G_frame.detach()))
             optimizer_D.zero_grad()
             D_l.backward()
@@ -132,16 +132,15 @@ try:
             G_l_t.backward()
             optimizer_G.step()
 
-            # torch.cuda.synchronize()
+            torch.cuda.synchronize()
             time_end = time.time()
-            if step > 1:  # This considers all the consumed time, including the testing time during training.
+            if step > start_iter:  # This doesn't include the testing time during training.
                 iter_t = time_end - temp
-                elapsed += iter_t
             temp = time_end
 
-            if step % 20 == 0:
-                time_reamin = (train_cfg.iters - step) / step * elapsed
-                eta = str(datetime.timedelta(seconds=time_reamin)).split('.')[0]
+            if step != start_iter and step % 20 == 0:
+                time_remain = (train_cfg.iters - step) * iter_t
+                eta = str(datetime.timedelta(seconds=time_remain)).split('.')[0]
                 psnr = psnr_error(G_frame, target_frame)
                 print(f"[{step}]  inte_l: {inte_l:.3f} | grad_l: {grad_l:.3f} | fl_l: {fl_l:.3f} | g_l: {g_l:.3f} | "
                       f"G_l_total: {G_l_t:.3f} | D_l: {D_l:.3f} | psnr: {psnr:.3f} | iter: {iter_t:.3f}s | ETA: {eta}")
@@ -175,12 +174,17 @@ try:
                 writer.add_scalar('results/auc', auc, global_step=step)
                 generator.train()
 
+            step += 1
             if step > train_cfg.iters:
                 training = False
                 break
 
 except KeyboardInterrupt:
     print(f'\nStop early, model saved: \'latest_{train_cfg.dataset}_{step}.pth\'.\n')
+
+    if glob(f'weights/latest*'):
+        os.remove(glob(f'weights/latest*')[0])
+
     model_dict = {'net_g': generator.state_dict(), 'optimizer_g': optimizer_G.state_dict(),
                   'net_d': discriminator.state_dict(), 'optimizer_d': optimizer_D.state_dict()}
     torch.save(model_dict, f'weights/latest_{train_cfg.dataset}_{step}.pth')

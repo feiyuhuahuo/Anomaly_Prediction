@@ -16,8 +16,9 @@ from models.unet import UNet
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
 parser.add_argument('--dataset', default='avenue', type=str, help='The name of the dataset to train.')
 parser.add_argument('--input_num', default='4', type=int, help='The frame number to be used to predict one frame.')
+parser.add_argument('--img_size', default=(256, 256), type=tuple, help='The image size for training and evaluating.')
 parser.add_argument('--color_type', default='colorful', type=str, help='The color type of the dataset.')
-parser.add_argument('--trained_g', default='G_80000.pth', type=str, help='The pre-trained generator to evaluate.')
+parser.add_argument('--trained_model', default=None, type=str, help='The pre-trained model to evaluate.')
 parser.add_argument('--show_curve', action='store_true', help='Show the psnr curve real-timely, this drops fps.')
 parser.add_argument('--show_heatmap', action='store_true',
                     help='Show the difference heatmap real-timely, this drops fps.')
@@ -29,15 +30,15 @@ def val(cfg, model=None):
         generator.eval()
     else:
         generator = UNet(input_channels=12, output_channel=3).cuda().eval()
-        generator.load_state_dict(torch.load('weights/' + cfg.trained_g)['net'])
-        print(f'The pre-trained generator has been loaded with \'weights/{cfg.trained_g}\'.\n')
+        generator.load_state_dict(torch.load('weights/' + cfg.trained_model)['net_g'])
+        print(f'The pre-trained generator has been loaded from \'weights/{cfg.trained_model}\'.\n')
 
     video_folders = os.listdir(cfg.test_data)
     video_folders.sort()
     video_folders = [os.path.join(cfg.test_data, aa) for aa in video_folders]
 
     fps = 0
-    psnr_groups = []
+    psnr_group = []
 
     if not model and cfg.show_curve:
         fig = plt.get_current_fig_manager()
@@ -89,7 +90,7 @@ def val(cfg, model=None):
 
             if not model and cfg.show_heatmap:
                 diff_map = torch.sum(torch.abs(G_frame - target_frame).squeeze(), 0)
-                diff_map -= diff_map.min()
+                diff_map -= diff_map.min()  # Normalize to 0 ~ 255.
                 diff_map /= diff_map.max()
                 diff_map *= 255
                 diff_map = diff_map.cpu().detach().numpy().astype('uint8')
@@ -105,28 +106,31 @@ def val(cfg, model=None):
             temp = end
             print(f'\rDetecting: [{i:02d}] {j}/{len(dataset)}, {fps:.2f} fps.', end='')
 
-        psnr_groups.append(psnrs)
+        psnr_group.append(np.array(psnrs))
     print('\nAll frames were detected, begin to compute AUC.')
 
     gt_loader = Label_loader(cfg, video_folders)  # Get gt labels.
     gt = gt_loader()
 
-    detected_num = len(psnr_groups)
-    assert detected_num == len(gt), f'Ground truth has {len(gt)} videos, but got {detected_num} detected videos.'
+    assert len(psnr_group) == len(gt), f'Ground truth has {len(gt)} videos, but got {len(psnr_group)} detected videos.'
 
     scores = np.array([], dtype=np.float32)
     labels = np.array([], dtype=np.int8)
-    for i in range(detected_num):
-        distance = psnr_groups[i]
+    for i in range(len(psnr_group)):
+        distance = psnr_group[i]
         distance -= min(distance)  # distance = (distance - min) / (max - min)
         distance /= max(distance)
 
         scores = np.concatenate((scores, distance), axis=0)
         labels = np.concatenate((labels, gt[i][4:]), axis=0)  # Exclude the first 4 unpredictable frames in gt.
 
+    assert scores.shape == labels.shape, \
+        f'Ground truth has {labels.shape[0]} frames, but got {scores.shape[0]} detected frames.'
+
     fpr, tpr, thresholds = metrics.roc_curve(labels, scores, pos_label=0)
     auc = metrics.auc(fpr, tpr)
-    print(f'AUC: {auc}')
+    print(f'AUC: {auc}\n')
+    return auc
 
 
 if __name__ == '__main__':

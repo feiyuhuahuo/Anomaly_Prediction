@@ -36,5 +36,9 @@ import torch.nn as nn
 # out = net(aa)
 # loss = torch.sum((out - 1) ** 2)
 #
-# loss.backward() ⬃⬆ ⇩↧⬋属于Miscellaneous Symbols and Arrows杂项符号和箭头该分区共有256个，ASCII码为：&#11019,想了解更多内容请来https://www.ziti163.com/uni
+# loss.backward()
 # print(net.x2.grad)
+import numpy as np
+aa = np.array([1,2,3,4])
+aa -= min(aa)
+print(aa)
