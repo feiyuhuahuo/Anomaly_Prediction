@@ -15,9 +15,8 @@ from models.unet import UNet
 
 parser = argparse.ArgumentParser(description='Anomaly Prediction')
 parser.add_argument('--dataset', default='avenue', type=str, help='The name of the dataset to train.')
-parser.add_argument('--input_num', default='4', type=int, help='The frame number to be used to predict one frame.')
+parser.add_argument('--input_num', default=4, type=int, help='The frame number to be used to predict one frame.')
 parser.add_argument('--img_size', default=(256, 256), type=tuple, help='The image size for training and evaluating.')
-parser.add_argument('--color_type', default='colorful', type=str, help='The color type of the dataset.')
 parser.add_argument('--trained_model', default=None, type=str, help='The pre-trained model to evaluate.')
 parser.add_argument('--show_curve', action='store_true', help='Show the psnr curve real-timely, this drops fps.')
 parser.add_argument('--show_heatmap', action='store_true',

@@ -12,7 +12,6 @@ share_config = {'mode': 'training',
                 'dataset': 'avenue',
                 'img_size': (256, 256),
                 'data_root': '/home/feiyu/Data/',  # remember the final '/'
-                'color_type': 'colorful',
                 'input_num': 4}
 
 
@@ -33,9 +32,6 @@ def update_config(args=None, mode=None):
     share_config['dataset'] = args.dataset
     share_config['input_num'] = args.input_num
     share_config['img_size'] = args.img_size
-
-    assert args.color_type in ['colorful', 'grey'], 'Color type can only be \'colorful\' or \'grey\'.'
-    share_config['color_type'] = args.color_type
 
     if mode == 'train':
         share_config['batch_size'] = args.batch_size
