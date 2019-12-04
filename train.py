@@ -6,6 +6,7 @@ import datetime
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 import argparse
+import random
 import pdb
 
 from utils import *
@@ -72,6 +73,7 @@ flow_loss = Flow_Loss().cuda()
 intensity_loss = Intensity_Loss().cuda()
 
 train_dataset = Dataset.train_dataset(train_cfg)
+
 # Remember to set drop_last=True, because we need to use 4 frames to predict one frame.
 train_dataloader = DataLoader(dataset=train_dataset, batch_size=train_cfg.batch_size,
                               shuffle=True, num_workers=4, drop_last=True)
@@ -84,10 +86,17 @@ discriminator = discriminator.train()
 try:
     step = start_iter
     while training:
-        for clips, flow_strs in train_dataloader:
+        for indice, clips, flow_strs in train_dataloader:
             input_frames = clips[:, 0:12, :, :].cuda()  # (n, 12, 256, 256)
             target_frame = clips[:, 12:15, :, :].cuda()  # (n, 3, 256, 256)
             input_last = input_frames[:, 9:12, :, :].cuda()  # use for flow_loss
+
+            # pop() the used frame index, this can't work in train_dataset.__getitem__.
+            for index in indice:
+                train_dataset.all_seqs[index].pop()
+                if len(train_dataset.all_seqs[index]) == 0:
+                    train_dataset.all_seqs[index] = list(range(len(train_dataset.videos[index]) - 4))
+                    random.shuffle(train_dataset.all_seqs[index])
 
             G_frame = generator(input_frames)
 

@@ -37,8 +37,8 @@ def update_config(args=None, mode=None):
         share_config['batch_size'] = args.batch_size
         share_config['train_data'] = share_config['data_root'] + args.dataset + '/training/frames'
         share_config['test_data'] = share_config['data_root'] + args.dataset + '/testing/frames'
-        share_config['g_lr'] = 0.0002 if args.color_type == 'colorful' else 0.0001
-        share_config['d_lr'] = 0.00002 if args.color_type == 'colorful' else 0.00001
+        share_config['g_lr'] = 0.0002
+        share_config['d_lr'] = 0.00002
         share_config['resume'] = glob(f'weights/{args.resume}*')[0] if args.resume else None
         share_config['iters'] = args.iters
         share_config['show_flow'] = args.show_flow

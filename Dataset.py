@@ -1,3 +1,4 @@
+import random
 import torch
 import numpy as np
 import cv2
@@ -27,20 +28,24 @@ class train_dataset(Dataset):
         self.clip_length = cfg.input_num + 1
 
         self.videos = []
+        self.all_seqs = []
         for folder in sorted(glob.glob(f'{cfg.train_data}/*')):
             all_imgs = glob.glob(f'{folder}/*.jpg')
             all_imgs.sort()
             self.videos.append(all_imgs)
 
+            random_seq = list(range(len(all_imgs) - 4))
+            random.shuffle(random_seq)
+            self.all_seqs.append(random_seq)
+
     def __len__(self):  # This decide the indice range of the PyTorch Dataloader.
         return len(self.videos)
 
-    def __getitem__(self, indice):
-        # When getting video clips, shuffle across all video folders and all frames in one folder.
+    def __getitem__(self, indice):  # Indice decide which video folder to be loaded.
         one_folder = self.videos[indice]
-        start = np.random.randint(0, len(one_folder) - self.clip_length)
-        video_clip = []
 
+        video_clip = []
+        start = self.all_seqs[indice][-1]
         for i in range(start, start + self.clip_length):
             video_clip.append(np_load_frame(one_folder[i], self.img_h, self.img_w))
 
@@ -48,7 +53,7 @@ class train_dataset(Dataset):
         video_clip = torch.from_numpy(video_clip)
 
         flow_str = f'{indice}_{start + 3}-{start + 4}'
-        return video_clip, flow_str
+        return indice, video_clip, flow_str
 
 
 class test_dataset:
