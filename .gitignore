@@ -3,4 +3,5 @@ tensorboard_log/
 __pycache__/
 .idea/
 *.pth
-*.jpg
+results
+images

@@ -25,7 +25,7 @@ class train_dataset(Dataset):
     def __init__(self, cfg):
         self.img_h = cfg.img_size[0]
         self.img_w = cfg.img_size[1]
-        self.clip_length = cfg.input_num + 1
+        self.clip_length = 5
 
         self.videos = []
         self.all_seqs = []
@@ -45,7 +45,7 @@ class train_dataset(Dataset):
         one_folder = self.videos[indice]
 
         video_clip = []
-        start = self.all_seqs[indice][-1]
+        start = self.all_seqs[indice][-1]  # Always use the last index in self.all_seqs.
         for i in range(start, start + self.clip_length):
             video_clip.append(np_load_frame(one_folder[i], self.img_h, self.img_w))
 
@@ -60,7 +60,7 @@ class test_dataset:
     def __init__(self, cfg, video_folder):
         self.img_h = cfg.img_size[0]
         self.img_w = cfg.img_size[1]
-        self.clip_length = cfg.input_num + 1
+        self.clip_length = 5
         self.imgs = glob.glob(video_folder + '/*.jpg')
         self.imgs.sort()
 
@@ -77,19 +77,9 @@ class test_dataset:
 
 
 class Label_loader:
-
-    # SHANGHAITECH_LABEL_PATH = os.path.join(DATA_DIR, 'shanghaitech/testing/test_frame_mask')
-    #
-    # NAME_MAT_MAPPING = {AVENUE: os.path.join(DATA_DIR, 'avenue/avenue.mat'),
-    #                     PED1: os.path.join(DATA_DIR, 'ped1/ped1.mat'),
-    #                     PED2: os.path.join(DATA_DIR, 'ped2/ped2.mat')}
-    #
-    # NAME_FRAMES_MAPPING = {AVENUE: os.path.join(DATA_DIR, 'avenue/testing/frames'),
-    #                        PED1: os.path.join(DATA_DIR, 'ped1/testing/frames'),
-    #                        PED2: os.path.join(DATA_DIR, 'ped2/testing/frames')}
-
     def __init__(self, cfg, video_folders):
         assert cfg.dataset in ('ped2', 'avenue', 'shanghaitech'), f'Did not find the related gt for \'{cfg.dataset}\'.'
+        self.cfg = cfg
         self.name = cfg.dataset
         self.frame_path = cfg.test_data
         self.mat_path = f'{cfg.data_root + self.name}/{self.name}.mat'
@@ -97,12 +87,12 @@ class Label_loader:
 
     def __call__(self):
         if self.name == 'shanghaitech':
-            gt = self.__load_shanghaitech_gt()
+            gt = self.load_shanghaitech()
         else:
-            gt = self.load_ucsd_avenue_gt()
+            gt = self.load_ucsd_avenue()
         return gt
 
-    def load_ucsd_avenue_gt(self):
+    def load_ucsd_avenue(self):
         abnormal_events = scio.loadmat(self.mat_path, squeeze_me=True)['gt']
 
         all_gt = []
@@ -124,14 +114,12 @@ class Label_loader:
 
         return all_gt
 
-    @staticmethod
-    def __load_shanghaitech_gt():
-        video_path_list = os.listdir(Label_loader.SHANGHAITECH_LABEL_PATH)
-        video_path_list.sort()
+    def load_shanghaitech(self):
+        np_list = glob.glob(f'{self.cfg.data_root + self.name}/frame_masks/')
+        np_list.sort()
 
         gt = []
-        for video in video_path_list:
-            # print(os.path.join(GroundTruthLoader.SHANGHAITECH_LABEL_PATH, video))
-            gt.append(np.load(os.path.join(Label_loader.SHANGHAITECH_LABEL_PATH, video)))
+        for npy in np_list:
+            gt.append(np.load(npy))
 
         return gt

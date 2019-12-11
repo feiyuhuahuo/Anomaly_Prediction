@@ -39,37 +39,31 @@
 #
 # loss.backward()
 # print(net.x1.grad)
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
 
-class aa(Dataset):
-    def __init__(self):
-        self.all_seqs = [[1, 0, 2, 3], [3, 2, 1, 0]]
+import matplotlib.pyplot as plt
+import numpy as np
+import io
+from PIL import Image
+import cv2
 
-    def __len__(self):
-        return 2
+# 使用plt进行画图
 
-    def __getitem__(self, indice):
+ss = Image.open('slark.png')  # 读取图片像素为512X512
+fig = plt.figure("Image")  # 图像窗口名称
 
-        start = self.all_seqs[indice][-1]
+plt.imshow(ss)
 
-        return indice, start
+buffer = io.BytesIO()  # 获取输入输出流对象
+print(buffer)
 
-bb = aa()
-train_dataloader = DataLoader(dataset=bb, batch_size=1,
-                              shuffle=True, num_workers=1, drop_last=True)
+fig.canvas.print_png(buffer)  # 将画布上的内容打印到输入输出流对象
+data = buffer.getvalue()  # 获取流的值
 
-for i in range(50):
-    for ii, ss in train_dataloader:
-        print(ii, ss)
-
-        bb.all_seqs[ii].pop()
-        print(bb.all_seqs)
-
-        if len(bb.all_seqs[ii]) == 0:
-            print('~~~~~~~')
-            bb.all_seqs[ii] = list(range(4))
+buffer.write(data)  # 将数据写入buffer
+img = np.array(Image.open(buffer))
 
 
+print("转换的图片array的尺寸为:\n", img.shape)
+cv2.imwrite("02.jpg", img)
 
-
+buffer.close()
