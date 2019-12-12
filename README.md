@@ -24,16 +24,16 @@ Other common packages.
 
 |USCD Ped2                                                                            | CUHK Avenue                                                                           |
 |:-----------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------------:|
-|[Google Drive](https://drive.google.com/open?id=1PO5BCMHUnmyb4NRSBFu28squcDv5VWTR)   | [Google Drive](https://drive.google.com/open?id=1jAlQD46KCN0ZTRFajHWUqawGxsCtXu8U)    |
-|[Baidu Cloud: e0qj](https://pan.baidu.com/s/1HqDBczQn6nr_YUEoT9NnLA)                 | [Baidu Cloud: eqmu](https://pan.baidu.com/s/1FaduWLhj0CF4Fl8jPTl-mQ)                  |
+|[Google Drive](https://drive.google.com/open?id=1PO5BCMHUnmyb4NRSBFu28squcDv5VWTR)   | [Google Drive](https://drive.google.com/open?id=1b1q0kuc88rD5qDf5FksMwcJ43js4opbe)    |
+|[Baidu Cloud: e0qj](https://pan.baidu.com/s/1HqDBczQn6nr_YUEoT9NnLA)                 | [Baidu Cloud: ufq6](https://pan.baidu.com/s/1z9GZQedG-8I_oxJ1RuwUaA)                  |
 
 - Modify 'data_root' in `config.py`, and then unzip the datasets under your data root.
 - Download the trained weights and put them under the 'weights' folder.  
 
-|ped2_26000.pth                                                                      | avenue_.pth  |
-|:----------------------------------------------------------------------------------:|:-------------------------------------------------------------------:|
-| [Google Drive](https://drive.google.com/open?id=1dgeoZoiO0V_Wql6k7w_tGFDyiaxroGeo) |[Google Drive](https://pan.baidu.com/s/1XDeDwg1Xw9GJCucJNqdNZw)      |
-| [Baidu Cloud: 5hu9](https://pan.baidu.com/s/1y5pHwU0qSmbLmlSGni-93w)               |[Baidu Cloud: e0qj](https://pan.baidu.com/s/1uX_v1RPISxgwQ2LdsbJrJQ) |
+|ped2_26000.pth                                                                      | avenue_15000.pth  |
+|:----------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------:|
+| [Google Drive](https://drive.google.com/open?id=1dgeoZoiO0V_Wql6k7w_tGFDyiaxroGeo) |[Google Drive](https://drive.google.com/open?id=1iwgRtkXU6-H8VwTKHqYLfkOZzHvfyGRw)      |
+| [Baidu Cloud: 5hu9](https://pan.baidu.com/s/1y5pHwU0qSmbLmlSGni-93w)               |[Baidu Cloud: 92d8](https://pan.baidu.com/s/1ojLetmySGYW5ZSAIMPmdpw)                    |
 
 ## Train
 ```Shell
