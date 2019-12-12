@@ -3,10 +3,10 @@ Pytorch implementation of anomaly prediction for CVPR2018:[Future Frame Predicti
 This implementation used lite-flownet instead of Flownet2SD and the generator network is slightly different.  
 I only trained the ped2 and avenue datasets, the results:  
 
-|     AUC                  |ped2         | avenue             |
+|     AUC                  |USCD Ped2    |CUHK Avenue         |
 |:------------------------:|:-----------:|:------------------:|
 | original implementation  |95.4%        | 84.9%              |
-|  this  implementation    |95.6%        | [Baidu             |
+|  this  implementation    |95.6%        | 84.6%              |
 
 ### The network pipeline.  
 ![Example 0](contents/pipeline.png)
@@ -22,7 +22,7 @@ Other common packages.
 ## Prepare
 - Download the ped2 and avenue datasets.  
 
-|ped2                                                                                 | avenue                                                                                |
+|USCD Ped2                                                                            | CUHK Avenue                                                                           |
 |:-----------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------------:|
 |[Google Drive](https://drive.google.com/open?id=1PO5BCMHUnmyb4NRSBFu28squcDv5VWTR)   | [Google Drive](https://drive.google.com/open?id=1jAlQD46KCN0ZTRFajHWUqawGxsCtXu8U)    |
 |[Baidu Cloud: e0qj](https://pan.baidu.com/s/1HqDBczQn6nr_YUEoT9NnLA)                 | [Baidu Cloud: eqmu](https://pan.baidu.com/s/1FaduWLhj0CF4Fl8jPTl-mQ)                  |
@@ -30,17 +30,17 @@ Other common packages.
 - Modify 'data_root' in `config.py`, and then unzip the datasets under your data root.
 - Download the trained weights and put them under the 'weights' folder.  
 
-|Backbone   | box mAP  | mask mAP  | Google Drive                                                                                                         |Baidu Cloud          |
-|:---------:|:--------:|:---------:|:--------------------------------------------------------------------------------------------------------------------:|:----------------------------------------------------------------:|
-|Resnet50   | 30.25    | 28.04     | [res50_coco_800000.pth](https://drive.google.com/file/d/1kMm0tBZh8NuXBLmXKzVhOKR98Hpd81ja/view?usp=sharing)  |[password: mksf](https://pan.baidu.com/s/1XDeDwg1Xw9GJCucJNqdNZw) |
-|Resnet101  | 32.54    | 29.83     | [res101_coco_800000.pth](https://drive.google.com/file/d/1KyjhkLEw0D8zP8IiJTTOR0j6PGecKbqS/view?usp=sharing)      |[password: oubr](https://pan.baidu.com/s/1uX_v1RPISxgwQ2LdsbJrJQ) |
+|ped2_26000.pth                                                                      | avenue_.pth  |
+|:----------------------------------------------------------------------------------:|:-------------------------------------------------------------------:|
+| [Google Drive](https://drive.google.com/open?id=1dgeoZoiO0V_Wql6k7w_tGFDyiaxroGeo) |[Google Drive](https://pan.baidu.com/s/1XDeDwg1Xw9GJCucJNqdNZw)      |
+| [Baidu Cloud: 5hu9](https://pan.baidu.com/s/1y5pHwU0qSmbLmlSGni-93w)               |[Baidu Cloud: e0qj](https://pan.baidu.com/s/1uX_v1RPISxgwQ2LdsbJrJQ) |
 
 ## Train
 ```Shell
 # Train by default with specified dataset.
 python train.py --dataset=avenue
 # Train with different batch_size, you might need to tune the learning rate by yourself.
-python train.py --dataset=avenue --batch_size=8
+python train.py --dataset=avenue --batch_size=16
 # Set the max training iterations.
 python train.py --dataset=avenue --iters=80000
 # Set the save interval and the validation interval.
@@ -56,13 +56,14 @@ python train.py --dataset=avenue --show_flow
 ```Shell
 tensorboard --logdir=tensorboard_log/ped2_bs4
 ```
+![Example 1](contents/tensorboard.png)
 
 ## Evalution
 ```Shell
-# Evaluate.
+# Validate with a trained model.
 python evaluate.py --dataset=ped2 --trained_model=ped2_26000.pth
 # Show and save the psnr curve and the difference heatmap between the gt frame and the 
 # generated frame during evaluating. This drops fps.
 python evaluate.py --dataset=ped2 --trained_model=ped2_26000.pth --show_curve --show_heatmap
 ```
-![Example 1](contents/result.png)
+![Example 2](contents/result.png)
