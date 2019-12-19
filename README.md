@@ -28,7 +28,14 @@ Other common packages.
 |[Baidu Cloud: e0qj](https://pan.baidu.com/s/1HqDBczQn6nr_YUEoT9NnLA)                 | [Baidu Cloud: ufq6](https://pan.baidu.com/s/1z9GZQedG-8I_oxJ1RuwUaA)                  |
 
 - Modify 'data_root' in `config.py`, and then unzip the datasets under your data root.
-- Download the trained weights and put them under the 'weights' folder.  
+- Download the lite-flownet model and put it under the 'models/liteFlownet' folder, or the Flownet2SD model under the 'models/flownet2' folder.
+
+|network-default.pytorch                                                             | FlowNet2-SD.pth  |
+|:----------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------:|
+| [Google Drive](https://drive.google.com/open?id=16w2P4A4s_m7WSwgq38VTqrGIS6lhj7Ys) |[Google Drive](https://drive.google.com/open?id=1gwBdKeaJjJomU68x2dNl9Vdy9i9EKiaI)      |
+| [Baidu Cloud: auqh](https://pan.baidu.com/s/1OSXiPZ1kijkTBPgfgWAimA)               |[Baidu Cloud: v7qr](https://pan.baidu.com/s/1dfxVX_QX1JUUc6y3f6IDYw)                    |
+
+- Download the trained model and put them under the 'weights' folder.  
 
 |ped2_26000.pth                                                                      | avenue_15000.pth  |
 |:----------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------:|
