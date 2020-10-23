@@ -123,16 +123,39 @@ try:
             g_l = adversarial_loss(discriminator(G_frame))
             G_l_t = 1. * inte_l + 1. * grad_l + 2. * fl_l + 0.05 * g_l
 
-            # Train discriminator
             # When training discriminator, don't train generator, so use .detach() to cut off gradients.
             D_l = discriminate_loss(discriminator(target_frame), discriminator(G_frame.detach()))
+
+            # https://github.com/pytorch/pytorch/issues/39141
+            # torch.optim optimizer now do inplace detection for module parameters since PyTorch 1.5
+            # If I do this way:
+            # ----------------------------------------
+            # optimizer_D.zero_grad()
+            # D_l.backward()
+            # optimizer_D.step()
+            # optimizer_G.zero_grad()
+            # G_l_t.backward()
+            # optimizer_G.step()
+            # ----------------------------------------
+            # The optimizer_D.step() modifies the discriminator parameters inplace.
+            # But these parameters are required to compute the generator gradient for the generator.
+
+            # Thus I should make sure no parameters are modified before calling .step(), like this:
+            # ----------------------------------------
+            # optimizer_G.zero_grad()
+            # G_l_t.backward()
+            # optimizer_G.step()
+            # optimizer_D.zero_grad()
+            # D_l.backward()
+            # optimizer_D.step()
+            # ----------------------------------------
+
+            # Or just do .step() after all the gradients have been computed, like the following way:
             optimizer_D.zero_grad()
             D_l.backward()
-            optimizer_D.step()
-
-            # Train generator
             optimizer_G.zero_grad()
             G_l_t.backward()
+            optimizer_D.step()
             optimizer_G.step()
 
             torch.cuda.synchronize()

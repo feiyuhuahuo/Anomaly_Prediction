@@ -9,8 +9,6 @@ class Stream:
     ptr = torch.cuda.current_stream().cuda_stream
 
 
-# end
-
 kernel_Correlation_rearrange = '''
 	extern "C" __global__ void kernel_Correlation_rearrange(
 		const int n,
